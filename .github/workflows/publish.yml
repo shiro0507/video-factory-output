@@ -1,0 +1,76 @@
+name: publish-instagram
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "対象のリリースタグ(手動実行時)"
+        required: true
+
+# 同じ動画を二重投稿しないよう、タグ単位で直列化
+concurrency:
+  group: publish-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: リリース情報を解決
+        id: rel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          echo "対象タグ: $TAG"
+
+          # .meta.json を取得
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern "*.meta.json" --dir meta --clobber
+
+          # mp4 アセットの公開ダウンロードURL(認証不要)を取得
+          VIDEO_URL=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '[.assets[] | select(.name | endswith(".mp4")) | .url][0]')
+          if [ -z "$VIDEO_URL" ] || [ "$VIDEO_URL" = "null" ]; then
+            echo "::error::mp4 アセットが見つかりません"
+            exit 1
+          fi
+          echo "video_url=$VIDEO_URL" >> "$GITHUB_OUTPUT"
+
+      - name: キャプション組み立て
+        id: cap
+        run: |
+          set -euo pipefail
+          META=$(ls meta/*.meta.json | head -1)
+          echo "メタファイル: $META"
+          CAPTION=$(node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const tags = (m.hashtags || [])
+              .map((t) => (t.startsWith("#") ? t : "#" + t))
+              .join(" ");
+            process.stdout.write([m.caption || "", tags].filter(Boolean).join("\n\n"));
+          ' "$META")
+          {
+            echo "caption<<__EOF__"
+            echo "$CAPTION"
+            echo "__EOF__"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Instagram Reels へ投稿
+        env:
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          VIDEO_URL: ${{ steps.rel.outputs.video_url }}
+          CAPTION: ${{ steps.cap.outputs.caption }}
+        run: node scripts/publish-instagram.mjs

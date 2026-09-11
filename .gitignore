@@ -1,0 +1,5 @@
+node_modules/
+meta/
+*.mp4
+.DS_Store
+.env
