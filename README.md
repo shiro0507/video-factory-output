@@ -18,11 +18,17 @@ GCP Cloud Run Job          このリポジトリ                 レビューUI(
 - レンダリングの重い処理は GCP、投稿は Actions に分離
 - 動画の受け渡しは **Release アセット**（公開リポジトリなので mp4 の
   ダウンロードURLがそのまま Instagram の `video_url` に使える）
-- ⚠️ Releaseアセットの実体（Azure Blob Storageへのリダイレクト先）はCORS非対応で、
-  ブラウザの`fetch()`からは公開済みでも読めない。動画/画像プレビューは
-  `<video>`/`<img>`のネイティブ要素で読み込む（CORSの制約を受けない）ため、
-  **draft中はレビューUIを開くブラウザでgithub.comにログインしている必要がある**
-  （このリポジトリへのアクセス権を持つアカウントで）。publish後は認証不要で見える
+- ⚠️ Releaseアセットには2つのGitHub側の制約があり、レビューUIはこれを前提に作っている:
+  1. アセットの実体（Azure Blob Storageへのリダイレクト先）は**CORS非対応**で、
+     ブラウザの`fetch()`からは公開済みでも読めない
+     → 投稿メタデータ(caption等)はアセットにせず**Release本文(body)にjsonを埋め込む**
+     （bodyは `/releases` のAPIレスポンスに直接含まれ、CORSの影響を受けない）
+  2. アセットは常に `Content-Type: application/octet-stream` +
+     `Content-Disposition: attachment`（強制ダウンロード）で配信される
+     → `<video>`タグはこのMIMEでは再生を拒否するため、ブラウザ内プレビューは
+     ベストエフォートに留め、確実に機能する「ダウンロードして確認」リンクを併置している
+  - **draft中はレビューUIを開くブラウザでgithub.comにログインしている必要がある**
+    （このリポジトリへのアクセス権を持つアカウントで。publish後は認証不要）
 - **公開前に人間のレビュー + 投稿頻度の平準化を挟む**（3段階のライフサイクル）:
   1. GCP側は Release を **draft**（`draft=true, prerelease=false`）のまま作成する
      （`GITHUB_RELEASE_AUTO_PUBLISH=true` を指定しない限り自動publishしない）

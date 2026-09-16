@@ -111,6 +111,19 @@
     object-fit: contain;
     background: #000;
   }
+  .download-link {
+    display: block;
+    text-align: center;
+    padding: 10px;
+    background: #12141a;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.85rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .download-link:hover {
+    background: #1a1e2a;
+  }
   .media-type {
     font-size: 0.75rem;
     color: var(--muted);
@@ -203,7 +216,8 @@
 
 <h1>投稿レビュー</h1>
 <div class="sub">shiro0507/video-factory-output — 動画を目視確認 → 承認済みキューへ。実際の投稿は毎日9:00(JST)の日次バッチが1件ずつ処理します。<br>
-※ 動画/画像プレビューが表示されない場合、このブラウザで github.com に(リポジトリへアクセス権のあるアカウントで)ログインしてください(draft中のアセットはログイン無しでは読み込めません)。</div>
+※ GitHubの仕様上、動画/画像はブラウザ内で再生・表示できない場合があります。その場合は「ダウンロードして確認」リンクから確認してください。<br>
+※ draft中のダウンロードには、このブラウザで github.com に(リポジトリへアクセス権のあるアカウントで)ログインしている必要があります。</div>
 
 <div id="tokenBar">
   <span class="hint">GitHub Personal Access Token（対象リポジトリの Contents: Read and write）。このブラウザにのみ保存されます。</span>
@@ -364,26 +378,48 @@ async function renderCard(rel, mode, queuePosition) {
     .sort((a, b) => a.name.localeCompare(b.name));
   const meta = parseMeta(rel.body);
 
-  // ネイティブの<video>/<img>要素で読み込む(fetch()と違いCORSの制約を受けない)。
-  // draft中はブラウザがgithub.com(このアセットへのアクセス権を持つアカウント)に
-  // ログイン済みである必要がある。ログインしていないと404になる。
+  // GitHubのRelease アセットは常に Content-Type: application/octet-stream +
+  // Content-Disposition: attachment(強制ダウンロード)で配信される仕様で、
+  // これは署名済みURLに焼き込まれており変更できない。<video>タグはこのMIMEでは
+  // 再生を拒否するため、<video>/<img>はダメ元のベストエフォート表示にとどめ、
+  // 確実に機能する「ダウンロードして確認」リンクを必ず併置する。
+  // draft中はいずれもブラウザがgithub.com(アクセス権を持つアカウント)に
+  // ログイン済みである必要がある(ログインしていないと404)。
   if (mp4) {
     const video = document.createElement("video");
     video.controls = true;
     video.preload = "metadata";
     video.src = mp4.browser_download_url;
     card.appendChild(video);
+
+    const dl = document.createElement("a");
+    dl.className = "download-link";
+    dl.href = mp4.browser_download_url;
+    dl.target = "_blank";
+    dl.rel = "noopener";
+    dl.textContent = `⬇ 動画をダウンロードして確認 (${(mp4.size / 1024 / 1024).toFixed(1)}MB)`;
+    card.appendChild(dl);
   } else if (imageAssets.length) {
     const carousel = document.createElement("div");
     carousel.className = "carousel";
     for (const a of imageAssets) {
+      const link = document.createElement("a");
+      link.href = a.browser_download_url;
+      link.target = "_blank";
+      link.rel = "noopener";
       const img = document.createElement("img");
       img.src = a.browser_download_url;
       img.loading = "lazy";
-      img.alt = a.name;
-      carousel.appendChild(img);
+      img.alt = `${a.name}(クリックでダウンロード)`;
+      link.appendChild(img);
+      carousel.appendChild(link);
     }
     card.appendChild(carousel);
+
+    const dl = document.createElement("div");
+    dl.className = "download-link";
+    dl.textContent = "⬇ 各画像はクリックでダウンロードして確認できます";
+    card.appendChild(dl);
   }
 
   const body = document.createElement("div");
