@@ -5,9 +5,11 @@ name: daily-batch-publish
 # 実際のInstagram投稿は既存の publish.yml がそのまま担当する。
 #
 # 注意点(必ず維持すること):
-# 1. 対象の特定・publishともに release id を使う(tag_nameは使わない)。
-#    draft中のtag_nameはGitHubが割り当てる仮名("untagged-xxxx")を返す仕様で、
-#    これを publish 時に指定すると仮名がそのまま本タグとして確定してしまう。
+# 1. 対象の特定は release id で行う(draft中のtag_nameはGitHubが割り当てる
+#    仮名"untagged-xxxx"を返す仕様で信用できない)。
+#    さらに、draft中の release を一度でもPATCHすると、tag_nameを明示しない限り
+#    その仮名が本タグとして確定してしまうため、publish時のPATCHには
+#    必ず本来の名前(release.name)をtag_nameとして明示的に含めること。
 # 2. publish操作は secrets.RELEASE_PAT(fine-grained PAT)を使うこと。
 #    デフォルトの github.token(GITHUB_TOKEN) で発生させたイベントは
 #    無限ループ防止のため他のワークフローを再トリガーしない仕様があり、
@@ -28,14 +30,17 @@ jobs:
           GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           set -euo pipefail
-          ID=$(gh api "repos/${{ github.repository }}/releases" --paginate \
-            --jq '[.[] | select(.draft==true and .prerelease==true)] | sort_by(.created_at) | .[0].id // empty')
-          if [ -z "$ID" ]; then
+          PICKED=$(gh api "repos/${{ github.repository }}/releases" --paginate \
+            --jq '[.[] | select(.draft==true and .prerelease==true)] | sort_by(.created_at) | .[0] | "\(.id)\t\(.name)"')
+          if [ -z "$PICKED" ]; then
             echo "承認済みキューは空です。今日は何もしません。"
             echo "id=" >> "$GITHUB_OUTPUT"
           else
-            echo "投稿対象 release id: $ID"
+            ID=$(echo "$PICKED" | cut -f1)
+            NAME=$(echo "$PICKED" | cut -f2)
+            echo "投稿対象 release id=$ID name=$NAME"
             echo "id=$ID" >> "$GITHUB_OUTPUT"
+            echo "name=$NAME" >> "$GITHUB_OUTPUT"
           fi
 
       - name: publish(→ publish.ymlが検知してInstagram投稿)
@@ -45,4 +50,4 @@ jobs:
         run: |
           set -euo pipefail
           gh api "repos/${{ github.repository }}/releases/${{ steps.pick.outputs.id }}" \
-            -X PATCH -F draft=false -F prerelease=false
+            -X PATCH -F draft=false -F prerelease=false -f "tag_name=${{ steps.pick.outputs.name }}"

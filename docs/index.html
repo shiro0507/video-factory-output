@@ -357,7 +357,7 @@ async function renderCard(rel, mode, queuePosition) {
 
   const title = document.createElement("div");
   title.className = "card-title";
-  title.textContent = rel.tag_name;
+  title.textContent = rel.name;
   body.appendChild(title);
 
   const metaLine = document.createElement("div");
@@ -394,12 +394,15 @@ async function renderCard(rel, mode, queuePosition) {
     approveBtn.className = "primary";
     approveBtn.textContent = "承認";
     approveBtn.addEventListener("click", async () => {
-      if (!confirm(`「${rel.tag_name}」を承認済みキューに追加します。実際の投稿は次回の日次バッチ（毎日9:00 JST）です。よろしいですか？`)) return;
+      if (!confirm(`「${rel.name}」を承認済みキューに追加します。実際の投稿は次回の日次バッチ（毎日9:00 JST）です。よろしいですか？`)) return;
       setBusy(true, "更新中...");
       try {
+        // tag_nameを明示しないと、draft中に一度でもPATCHすると
+        // GitHubが割り当てた仮タグ名("untagged-xxxx")が本タグとして
+        // 確定してしまうため、毎回nameの値をtag_nameとして送り直す
         await ghFetch(`/releases/${rel.id}`, {
           method: "PATCH",
-          body: JSON.stringify({ prerelease: true }),
+          body: JSON.stringify({ prerelease: true, tag_name: rel.name }),
         });
         card.remove();
         globalStatus.textContent = "承認済みキューに追加しました";
@@ -419,7 +422,7 @@ async function renderCard(rel, mode, queuePosition) {
       try {
         await ghFetch(`/releases/${rel.id}`, {
           method: "PATCH",
-          body: JSON.stringify({ prerelease: false }),
+          body: JSON.stringify({ prerelease: false, tag_name: rel.name }),
         });
         card.remove();
         globalStatus.textContent = "レビュー待ちに戻しました";
@@ -437,7 +440,7 @@ async function renderCard(rel, mode, queuePosition) {
   rejectBtn.className = "danger";
   rejectBtn.textContent = "却下して削除";
   rejectBtn.addEventListener("click", async () => {
-    if (!confirm(`「${rel.tag_name}」を削除します（投稿はされません）。よろしいですか？`)) return;
+    if (!confirm(`「${rel.name}」を削除します（投稿はされません）。よろしいですか？`)) return;
     setBusy(true, "削除中...");
     try {
       await ghFetch(`/releases/${rel.id}`, { method: "DELETE" });
