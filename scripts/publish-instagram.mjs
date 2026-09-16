@@ -8,6 +8,7 @@
 //   MEDIA_TYPE      … "REELS"(既定) または "CAROUSEL"
 //   VIDEO_URL       … MEDIA_TYPE=REELS のとき必須。公開アクセス可能な mp4 の URL
 //   IMAGE_URLS      … MEDIA_TYPE=CAROUSEL のとき必須。カンマ区切りの画像URL(2〜10件、表示順)
+//   THUMB_OFFSET    … MEDIA_TYPE=REELS で任意。サムネイルに使うフレームのミリ秒位置
 //   CAPTION         … 投稿本文(ハッシュタグ含む)
 //   SHARE_TO_FEED   … "false" で Reels をフィードに出さない(既定: true。CAROUSELでは無視)
 //   GRAPH_VERSION   … 既定 "v21.0"
@@ -20,6 +21,7 @@ const TOKEN = process.env.INSTAGRAM_ACCESS_TOKEN;
 const IG_ID = process.env.INSTAGRAM_ACCOUNT_ID;
 const MEDIA_TYPE = (process.env.MEDIA_TYPE || "REELS").toUpperCase();
 const VIDEO_URL = process.env.VIDEO_URL;
+const THUMB_OFFSET = process.env.THUMB_OFFSET;
 const IMAGE_URLS = (process.env.IMAGE_URLS || "").split(",").map((s) => s.trim()).filter(Boolean);
 const CAPTION = process.env.CAPTION ?? "";
 const SHARE_TO_FEED = (process.env.SHARE_TO_FEED ?? "true") !== "false";
@@ -77,12 +79,17 @@ let creationId;
 if (MEDIA_TYPE === "REELS") {
   console.log("[1/3] メディアコンテナ作成中...(REELS)");
   console.log(`  video_url: ${VIDEO_URL}`);
-  const container = await post(`${IG_ID}/media`, {
+  const params = {
     media_type: "REELS",
     video_url: VIDEO_URL,
     caption: CAPTION,
     share_to_feed: String(SHARE_TO_FEED),
-  });
+  };
+  if (THUMB_OFFSET) {
+    params.thumb_offset = THUMB_OFFSET;
+    console.log(`  thumb_offset: ${THUMB_OFFSET}ms`);
+  }
+  const container = await post(`${IG_ID}/media`, params);
   creationId = container.id;
   if (!creationId) die(`container id が返りませんでした: ${JSON.stringify(container)}`);
   console.log(`  creation_id: ${creationId}`);

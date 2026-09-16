@@ -87,6 +87,13 @@ jobs:
             echo "__EOF__"
           } >> "$GITHUB_OUTPUT"
 
+          THUMB_OFFSET=$(node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            process.stdout.write(m.thumb_offset != null ? String(m.thumb_offset) : "");
+          ' "$META")
+          echo "thumb_offset=$THUMB_OFFSET" >> "$GITHUB_OUTPUT"
+
       - name: Instagram へ投稿(Reels or カルーセル)
         env:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
@@ -94,5 +101,6 @@ jobs:
           MEDIA_TYPE: ${{ steps.rel.outputs.media_type }}
           VIDEO_URL: ${{ steps.rel.outputs.video_url }}
           IMAGE_URLS: ${{ steps.rel.outputs.image_urls }}
+          THUMB_OFFSET: ${{ steps.cap.outputs.thumb_offset }}
           CAPTION: ${{ steps.cap.outputs.caption }}
         run: node scripts/publish-instagram.mjs

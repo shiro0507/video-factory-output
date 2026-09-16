@@ -47,7 +47,8 @@ GCP Cloud Run Job          このリポジトリ                 レビューUI(
 {
   "caption": "投稿本文をここに。改行可。",
   "hashtags": ["旅行", "vlog", "#already_hashed_ok"],
-  "media_type": "REELS"
+  "media_type": "REELS",
+  "thumb_offset": 408
 }
 ```
 
@@ -55,6 +56,7 @@ GCP Cloud Run Job          このリポジトリ                 レビューUI(
 - `hashtags` の各要素は `#` 有無どちらでも可（ワークフローが付与）
 - 最終キャプション = `caption` + 空行 + ハッシュタグを space 連結
 - カルーセルの場合、レビューUI・`publish.yml` ともに画像アセットを**ファイル名の昇順**でソートして表示順・投稿順とする
+- `thumb_offset`（任意、REELSのみ）: サムネイルに使うフレームのミリ秒位置。省略時はInstagramが自動選択
 
 ## 必要な Secrets
 

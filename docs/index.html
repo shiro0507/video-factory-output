@@ -402,7 +402,8 @@ async function renderCard(rel, mode, queuePosition) {
   const metaLine = document.createElement("div");
   metaLine.className = "card-meta";
   const totalBytes = mp4 ? mp4.size : imageAssets.reduce((sum, a) => sum + a.size, 0);
-  metaLine.textContent = `作成: ${formatDate(rel.created_at)}${totalBytes ? ` / ${(totalBytes / 1024 / 1024).toFixed(1)}MB` : ""}`;
+  const thumbInfo = meta && meta.thumb_offset != null ? ` / サムネイル: ${(meta.thumb_offset / 1000).toFixed(1)}s地点` : "";
+  metaLine.textContent = `作成: ${formatDate(rel.created_at)}${totalBytes ? ` / ${(totalBytes / 1024 / 1024).toFixed(1)}MB` : ""}${thumbInfo}`;
   body.appendChild(metaLine);
 
   const captionBox = document.createElement("div");
