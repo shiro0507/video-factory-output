@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>投稿レビュー | video-factory-output</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0f1115;
+    --card: #1a1d24;
+    --border: #2a2e37;
+    --text: #e8eaed;
+    --muted: #9aa0aa;
+    --accent: #4f8cff;
+    --danger: #e5484d;
+    --ok: #2fb344;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Hiragino Sans, "Noto Sans JP", sans-serif;
+    padding: 16px;
+    padding-bottom: 64px;
+  }
+  h1 {
+    font-size: 1.25rem;
+    margin: 0 0 4px;
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+  }
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  button {
+    font: inherit;
+    border: 1px solid var(--border);
+    background: #232733;
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
+  button:hover { background: #2b3040; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: #3f7de0; }
+  button.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+  button.danger:hover { background: rgba(229,72,77,0.12); }
+  input[type="password"], input[type="text"] {
+    font: inherit;
+    background: #12141a;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 10px;
+    min-width: 220px;
+    max-width: 100%;
+  }
+  #tokenBar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 20px;
+  }
+  #tokenBar .hint { color: var(--muted); font-size: 0.8rem; flex-basis: 100%; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .card video {
+    width: 100%;
+    max-height: 420px;
+    background: #000;
+    display: block;
+  }
+  .card-body {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+  }
+  .card-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    word-break: break-all;
+  }
+  .card-meta {
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+  .caption {
+    white-space: pre-wrap;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    background: #12141a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .caption.empty { color: var(--muted); font-style: italic; }
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: auto;
+  }
+  .actions button { flex: 1; }
+  .status {
+    font-size: 0.8rem;
+    color: var(--muted);
+    min-height: 1.2em;
+  }
+  .empty-state {
+    color: var(--muted);
+    padding: 40px 0;
+    text-align: center;
+  }
+  .error {
+    color: var(--danger);
+    background: rgba(229,72,77,0.08);
+    border: 1px solid rgba(229,72,77,0.3);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+  }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>投稿レビュー</h1>
+<div class="sub">shiro0507/video-factory-output の draft Release を確認 → 承認して公開 / 却下</div>
+
+<div id="tokenBar">
+  <span class="hint">GitHub Personal Access Token（対象リポジトリの Contents: Read and write）。このブラウザにのみ保存されます。</span>
+  <input id="tokenInput" type="password" placeholder="github_pat_xxxxxxxx" />
+  <button id="saveTokenBtn" class="primary">保存</button>
+  <button id="clearTokenBtn">クリア</button>
+</div>
+
+<div class="toolbar">
+  <button id="refreshBtn" class="primary">更新</button>
+  <span id="globalStatus" class="status"></span>
+</div>
+
+<div id="errorBox"></div>
+<div id="grid" class="grid"></div>
+
+<script>
+const REPO = "shiro0507/video-factory-output";
+const API = `https://api.github.com/repos/${REPO}`;
+const TOKEN_KEY = "vfo_gh_token";
+
+const $ = (sel) => document.querySelector(sel);
+const grid = $("#grid");
+const errorBox = $("#errorBox");
+const globalStatus = $("#globalStatus");
+const tokenInput = $("#tokenInput");
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY) || "";
+}
+function setToken(v) {
+  if (v) localStorage.setItem(TOKEN_KEY, v);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+tokenInput.value = getToken();
+
+$("#saveTokenBtn").addEventListener("click", () => {
+  setToken(tokenInput.value.trim());
+  loadReleases();
+});
+$("#clearTokenBtn").addEventListener("click", () => {
+  tokenInput.value = "";
+  setToken("");
+  grid.innerHTML = "";
+  showError("トークンをクリアしました。再入力して「保存」してください。");
+});
+$("#refreshBtn").addEventListener("click", loadReleases);
+
+function showError(msg) {
+  errorBox.innerHTML = msg ? `<div class="error">${escapeHtml(msg)}</div>` : "";
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+async function ghFetch(path, opts = {}) {
+  const token = getToken();
+  if (!token) throw new Error("GitHub トークンが未設定です。上部で入力・保存してください。");
+  const res = await fetch(`${API}${path}`, {
+    ...opts,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`GitHub API エラー (${res.status}): ${body.slice(0, 300)}`);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+async function fetchMeta(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function formatDate(iso) {
+  try {
+    return new Date(iso).toLocaleString("ja-JP");
+  } catch {
+    return iso;
+  }
+}
+
+async function loadReleases() {
+  showError("");
+  globalStatus.textContent = "読み込み中...";
+  grid.innerHTML = "";
+  try {
+    const all = await ghFetch("/releases?per_page=50");
+    const drafts = all.filter((r) => r.draft);
+    if (drafts.length === 0) {
+      grid.innerHTML = `<div class="empty-state">レビュー待ちの動画はありません</div>`;
+      globalStatus.textContent = "";
+      return;
+    }
+    for (const rel of drafts) {
+      grid.appendChild(await renderCard(rel));
+    }
+    globalStatus.textContent = `${drafts.length}件`;
+  } catch (e) {
+    showError(e.message);
+    globalStatus.textContent = "";
+  }
+}
+
+async function renderCard(rel) {
+  const card = document.createElement("div");
+  card.className = "card";
+
+  const mp4 = rel.assets.find((a) => a.name.endsWith(".mp4"));
+  const metaAsset = rel.assets.find((a) => a.name.endsWith(".meta.json"));
+  const meta = metaAsset ? await fetchMeta(metaAsset.browser_download_url) : null;
+
+  const video = document.createElement("video");
+  video.controls = true;
+  video.preload = "metadata";
+  if (mp4) video.src = mp4.browser_download_url;
+  card.appendChild(video);
+
+  const body = document.createElement("div");
+  body.className = "card-body";
+
+  const title = document.createElement("div");
+  title.className = "card-title";
+  title.textContent = rel.tag_name;
+  body.appendChild(title);
+
+  const metaLine = document.createElement("div");
+  metaLine.className = "card-meta";
+  metaLine.textContent = `作成: ${formatDate(rel.created_at)}${mp4 ? ` / ${(mp4.size / 1024 / 1024).toFixed(1)}MB` : ""}`;
+  body.appendChild(metaLine);
+
+  const captionBox = document.createElement("div");
+  if (meta && meta.caption) {
+    captionBox.className = "caption";
+    const tags = (meta.hashtags || []).map((t) => (t.startsWith("#") ? t : "#" + t)).join(" ");
+    captionBox.textContent = [meta.caption, tags].filter(Boolean).join("\n\n");
+  } else {
+    captionBox.className = "caption empty";
+    captionBox.textContent = "キャプション情報なし";
+  }
+  body.appendChild(captionBox);
+
+  const status = document.createElement("div");
+  status.className = "status";
+  body.appendChild(status);
+
+  const actions = document.createElement("div");
+  actions.className = "actions";
+
+  const approveBtn = document.createElement("button");
+  approveBtn.className = "primary";
+  approveBtn.textContent = "承認して公開";
+  approveBtn.addEventListener("click", async () => {
+    if (!confirm(`「${rel.tag_name}」を公開します。公開するとInstagramへ自動投稿されます。よろしいですか？`)) return;
+    setBusy(true, "公開中...");
+    try {
+      await ghFetch(`/releases/${rel.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ draft: false }),
+      });
+      card.remove();
+      globalStatus.textContent = "公開しました";
+    } catch (e) {
+      status.textContent = e.message;
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  const rejectBtn = document.createElement("button");
+  rejectBtn.className = "danger";
+  rejectBtn.textContent = "却下して削除";
+  rejectBtn.addEventListener("click", async () => {
+    if (!confirm(`「${rel.tag_name}」を削除します（投稿はされません）。よろしいですか？`)) return;
+    setBusy(true, "削除中...");
+    try {
+      await ghFetch(`/releases/${rel.id}`, { method: "DELETE" });
+      card.remove();
+      globalStatus.textContent = "削除しました";
+    } catch (e) {
+      status.textContent = e.message;
+    } finally {
+      setBusy(false);
+    }
+  });
+
+  function setBusy(busy, msg) {
+    approveBtn.disabled = busy;
+    rejectBtn.disabled = busy;
+    status.textContent = busy ? msg : "";
+  }
+
+  actions.appendChild(approveBtn);
+  actions.appendChild(rejectBtn);
+  body.appendChild(actions);
+
+  card.appendChild(body);
+  return card;
+}
+
+if (getToken()) loadReleases();
+else showError("上部にGitHubトークンを入力・保存してください。");
+</script>
+</body>
+</html>
