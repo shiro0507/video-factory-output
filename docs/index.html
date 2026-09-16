@@ -141,6 +141,33 @@
     padding: 40px 0;
     text-align: center;
   }
+  h2 {
+    font-size: 1rem;
+    margin: 28px 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h2 .count {
+    color: var(--muted);
+    font-weight: normal;
+    font-size: 0.8rem;
+  }
+  .section-sub {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-bottom: 12px;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: var(--ok);
+    color: #06240b;
+    border-radius: 999px;
+    padding: 2px 9px;
+    margin-bottom: 4px;
+  }
   .error {
     color: var(--danger);
     background: rgba(229,72,77,0.08);
@@ -157,7 +184,7 @@
 <body>
 
 <h1>投稿レビュー</h1>
-<div class="sub">shiro0507/video-factory-output の draft Release を確認 → 承認して公開 / 却下</div>
+<div class="sub">shiro0507/video-factory-output — 動画を目視確認 → 承認済みキューへ。実際の投稿は毎日9:00(JST)の日次バッチが1件ずつ処理します。</div>
 
 <div id="tokenBar">
   <span class="hint">GitHub Personal Access Token（対象リポジトリの Contents: Read and write）。このブラウザにのみ保存されます。</span>
@@ -172,7 +199,14 @@
 </div>
 
 <div id="errorBox"></div>
-<div id="grid" class="grid"></div>
+
+<h2>レビュー待ち <span id="pendingCount" class="count"></span></h2>
+<div class="section-sub">確認して問題なければ「承認」してください（承認しても即投稿はされません）</div>
+<div id="pendingGrid" class="grid"></div>
+
+<h2>承認済み・投稿待ちキュー <span id="queueCount" class="count"></span></h2>
+<div class="section-sub">古い順に毎日9:00(JST)のバッチで1件ずつ投稿されます。先頭が次回の投稿対象です</div>
+<div id="queueGrid" class="grid"></div>
 
 <script>
 const REPO = "shiro0507/video-factory-output";
@@ -180,7 +214,10 @@ const API = `https://api.github.com/repos/${REPO}`;
 const TOKEN_KEY = "vfo_gh_token";
 
 const $ = (sel) => document.querySelector(sel);
-const grid = $("#grid");
+const pendingGrid = $("#pendingGrid");
+const queueGrid = $("#queueGrid");
+const pendingCount = $("#pendingCount");
+const queueCount = $("#queueCount");
 const errorBox = $("#errorBox");
 const globalStatus = $("#globalStatus");
 const tokenInput = $("#tokenInput");
@@ -202,7 +239,8 @@ $("#saveTokenBtn").addEventListener("click", () => {
 $("#clearTokenBtn").addEventListener("click", () => {
   tokenInput.value = "";
   setToken("");
-  grid.innerHTML = "";
+  pendingGrid.innerHTML = "";
+  queueGrid.innerHTML = "";
   showError("トークンをクリアしました。再入力して「保存」してください。");
 });
 $("#refreshBtn").addEventListener("click", loadReleases);
@@ -258,26 +296,42 @@ function formatDate(iso) {
 async function loadReleases() {
   showError("");
   globalStatus.textContent = "読み込み中...";
-  grid.innerHTML = "";
+  pendingGrid.innerHTML = "";
+  queueGrid.innerHTML = "";
   try {
     const all = await ghFetch("/releases?per_page=50");
     const drafts = all.filter((r) => r.draft);
-    if (drafts.length === 0) {
-      grid.innerHTML = `<div class="empty-state">レビュー待ちの動画はありません</div>`;
-      globalStatus.textContent = "";
-      return;
+    // 承認済みキュー(prerelease=true)は投稿順(古い順)に並べる
+    const pending = drafts.filter((r) => !r.prerelease);
+    const queued = drafts
+      .filter((r) => r.prerelease)
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    pendingCount.textContent = `(${pending.length}件)`;
+    queueCount.textContent = `(${queued.length}件)`;
+
+    pendingGrid.innerHTML = pending.length
+      ? ""
+      : `<div class="empty-state">レビュー待ちの動画はありません</div>`;
+    for (const rel of pending) {
+      pendingGrid.appendChild(await renderCard(rel, "pending"));
     }
-    for (const rel of drafts) {
-      grid.appendChild(await renderCard(rel));
+
+    queueGrid.innerHTML = queued.length
+      ? ""
+      : `<div class="empty-state">投稿待ちキューは空です</div>`;
+    for (let i = 0; i < queued.length; i++) {
+      queueGrid.appendChild(await renderCard(queued[i], "queued", i + 1));
     }
-    globalStatus.textContent = `${drafts.length}件`;
+
+    globalStatus.textContent = `合計${drafts.length}件`;
   } catch (e) {
     showError(e.message);
     globalStatus.textContent = "";
   }
 }
 
-async function renderCard(rel) {
+async function renderCard(rel, mode, queuePosition) {
   const card = document.createElement("div");
   card.className = "card";
 
@@ -293,6 +347,13 @@ async function renderCard(rel) {
 
   const body = document.createElement("div");
   body.className = "card-body";
+
+  if (mode === "queued") {
+    const badge = document.createElement("div");
+    badge.className = "badge";
+    badge.textContent = queuePosition === 1 ? "次回投稿予定" : `${queuePosition}番目`;
+    body.appendChild(badge);
+  }
 
   const title = document.createElement("div");
   title.className = "card-title";
@@ -321,26 +382,56 @@ async function renderCard(rel) {
 
   const actions = document.createElement("div");
   actions.className = "actions";
+  const busyButtons = [];
 
-  const approveBtn = document.createElement("button");
-  approveBtn.className = "primary";
-  approveBtn.textContent = "承認して公開";
-  approveBtn.addEventListener("click", async () => {
-    if (!confirm(`「${rel.tag_name}」を公開します。公開するとInstagramへ自動投稿されます。よろしいですか？`)) return;
-    setBusy(true, "公開中...");
-    try {
-      await ghFetch(`/releases/${rel.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ draft: false }),
-      });
-      card.remove();
-      globalStatus.textContent = "公開しました";
-    } catch (e) {
-      status.textContent = e.message;
-    } finally {
-      setBusy(false);
-    }
-  });
+  function setBusy(busy, msg) {
+    busyButtons.forEach((b) => (b.disabled = busy));
+    status.textContent = busy ? msg : "";
+  }
+
+  if (mode === "pending") {
+    const approveBtn = document.createElement("button");
+    approveBtn.className = "primary";
+    approveBtn.textContent = "承認";
+    approveBtn.addEventListener("click", async () => {
+      if (!confirm(`「${rel.tag_name}」を承認済みキューに追加します。実際の投稿は次回の日次バッチ（毎日9:00 JST）です。よろしいですか？`)) return;
+      setBusy(true, "更新中...");
+      try {
+        await ghFetch(`/releases/${rel.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ prerelease: true }),
+        });
+        card.remove();
+        globalStatus.textContent = "承認済みキューに追加しました";
+      } catch (e) {
+        status.textContent = e.message;
+      } finally {
+        setBusy(false);
+      }
+    });
+    busyButtons.push(approveBtn);
+    actions.appendChild(approveBtn);
+  } else {
+    const unqueueBtn = document.createElement("button");
+    unqueueBtn.textContent = "キューから戻す";
+    unqueueBtn.addEventListener("click", async () => {
+      setBusy(true, "更新中...");
+      try {
+        await ghFetch(`/releases/${rel.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ prerelease: false }),
+        });
+        card.remove();
+        globalStatus.textContent = "レビュー待ちに戻しました";
+      } catch (e) {
+        status.textContent = e.message;
+      } finally {
+        setBusy(false);
+      }
+    });
+    busyButtons.push(unqueueBtn);
+    actions.appendChild(unqueueBtn);
+  }
 
   const rejectBtn = document.createElement("button");
   rejectBtn.className = "danger";
@@ -358,15 +449,9 @@ async function renderCard(rel) {
       setBusy(false);
     }
   });
-
-  function setBusy(busy, msg) {
-    approveBtn.disabled = busy;
-    rejectBtn.disabled = busy;
-    status.textContent = busy ? msg : "";
-  }
-
-  actions.appendChild(approveBtn);
+  busyButtons.push(rejectBtn);
   actions.appendChild(rejectBtn);
+
   body.appendChild(actions);
 
   card.appendChild(body);
