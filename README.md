@@ -1,7 +1,8 @@
 # video-factory-output
 
-GCP(Cloud Run Jobs)でレンダリングした動画を受け取り、GitHub Actions から
-Instagram Reels へ自動投稿するためのリポジトリ。
+GCP(Cloud Run Jobs)でレンダリングした動画、または用意した画像を受け取り、
+GitHub Actions から Instagram へ自動投稿するためのリポジトリ。
+**Reels(動画1本)と画像カルーセル(2〜10枚)の両方に対応。**
 
 ## 仕組み
 
@@ -30,24 +31,30 @@ GCP Cloud Run Job          このリポジトリ                 レビューUI(
   - 却下する場合はレビューUIの「却下して削除」（どの段階でも可）
   - キューから戻したい場合は「キューから戻す」（`prerelease=false` に戻すだけ）
 
-## Release に添付するもの（GCP 側が生成）
+## Release に添付するもの（GCP 側 / アップロードスクリプトが生成）
 
 | ファイル | 内容 |
 |---|---|
-| `output-<timestamp>.mp4` | レンダリング済み動画（Reels: 9:16 推奨、最長15分/1GB以内） |
+| `output-<timestamp>.mp4` | Reels用動画（9:16推奨、最長15分/1GB以内） |
+| `slide-01.jpg` 〜 `slide-10.jpg` | カルーセル用画像（2〜10枚、ファイル名の連番＝表示順） |
 | `<任意>.meta.json` | 投稿メタデータ（下記スキーマ） |
+
+1つの Release には mp4 か 画像群 のどちらか一方のみを添付する（混在不可）。
 
 ### `.meta.json` スキーマ
 
 ```json
 {
   "caption": "投稿本文をここに。改行可。",
-  "hashtags": ["旅行", "vlog", "#already_hashed_ok"]
+  "hashtags": ["旅行", "vlog", "#already_hashed_ok"],
+  "media_type": "REELS"
 }
 ```
 
+- `media_type` は `"REELS"`（既定・省略可）または `"CAROUSEL"`
 - `hashtags` の各要素は `#` 有無どちらでも可（ワークフローが付与）
 - 最終キャプション = `caption` + 空行 + ハッシュタグを space 連結
+- カルーセルの場合、レビューUI・`publish.yml` ともに画像アセットを**ファイル名の昇順**でソートして表示順・投稿順とする
 
 ## 必要な Secrets
 
@@ -64,10 +71,21 @@ gh workflow run publish.yml -f tag=<リリースタグ>
 
 ## ローカルでの投稿テスト
 
+Reels:
 ```
 INSTAGRAM_ACCESS_TOKEN=xxx \
 INSTAGRAM_ACCOUNT_ID=xxx \
 VIDEO_URL='https://example.com/sample.mp4' \
+CAPTION='テスト投稿' \
+node scripts/publish-instagram.mjs
+```
+
+カルーセル:
+```
+INSTAGRAM_ACCESS_TOKEN=xxx \
+INSTAGRAM_ACCOUNT_ID=xxx \
+MEDIA_TYPE=CAROUSEL \
+IMAGE_URLS='https://example.com/1.jpg,https://example.com/2.jpg' \
 CAPTION='テスト投稿' \
 node scripts/publish-instagram.mjs
 ```

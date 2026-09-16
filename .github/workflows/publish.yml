@@ -37,15 +37,35 @@ jobs:
           # .meta.json を取得
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
             --pattern "*.meta.json" --dir meta --clobber
+          META=$(ls meta/*.meta.json | head -1)
 
-          # mp4 アセットの公開ダウンロードURL(認証不要)を取得
-          VIDEO_URL=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
-            --jq '[.assets[] | select(.name | endswith(".mp4")) | .url][0]')
-          if [ -z "$VIDEO_URL" ] || [ "$VIDEO_URL" = "null" ]; then
-            echo "::error::mp4 アセットが見つかりません"
-            exit 1
+          MEDIA_TYPE=$(node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            process.stdout.write((m.media_type || "REELS").toUpperCase());
+          ' "$META")
+          echo "media_type=$MEDIA_TYPE" >> "$GITHUB_OUTPUT"
+          echo "メディアタイプ: $MEDIA_TYPE"
+
+          if [ "$MEDIA_TYPE" = "CAROUSEL" ]; then
+            # 画像アセットの公開ダウンロードURL(認証不要)をファイル名の昇順(=表示順)で取得
+            IMAGE_URLS=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '[.assets[] | select(.name | test("\\.(jpe?g|png)$"; "i"))] | sort_by(.name) | map(.url) | join(",")')
+            if [ -z "$IMAGE_URLS" ]; then
+              echo "::error::画像アセットが見つかりません"
+              exit 1
+            fi
+            echo "image_urls=$IMAGE_URLS" >> "$GITHUB_OUTPUT"
+          else
+            # mp4 アセットの公開ダウンロードURL(認証不要)を取得
+            VIDEO_URL=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '[.assets[] | select(.name | endswith(".mp4")) | .url][0]')
+            if [ -z "$VIDEO_URL" ] || [ "$VIDEO_URL" = "null" ]; then
+              echo "::error::mp4 アセットが見つかりません"
+              exit 1
+            fi
+            echo "video_url=$VIDEO_URL" >> "$GITHUB_OUTPUT"
           fi
-          echo "video_url=$VIDEO_URL" >> "$GITHUB_OUTPUT"
 
       - name: キャプション組み立て
         id: cap
@@ -67,10 +87,12 @@ jobs:
             echo "__EOF__"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Instagram Reels へ投稿
+      - name: Instagram へ投稿(Reels or カルーセル)
         env:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          MEDIA_TYPE: ${{ steps.rel.outputs.media_type }}
           VIDEO_URL: ${{ steps.rel.outputs.video_url }}
+          IMAGE_URLS: ${{ steps.rel.outputs.image_urls }}
           CAPTION: ${{ steps.cap.outputs.caption }}
         run: node scripts/publish-instagram.mjs

@@ -97,6 +97,24 @@
     background: #000;
     display: block;
   }
+  .carousel {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    background: #000;
+  }
+  .carousel img {
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+    width: 100%;
+    max-height: 420px;
+    object-fit: contain;
+    background: #000;
+  }
+  .media-type {
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
   .card-body {
     padding: 14px;
     display: flex;
@@ -336,17 +354,38 @@ async function renderCard(rel, mode, queuePosition) {
   card.className = "card";
 
   const mp4 = rel.assets.find((a) => a.name.endsWith(".mp4"));
+  const imageAssets = rel.assets
+    .filter((a) => /\.(jpe?g|png)$/i.test(a.name))
+    .sort((a, b) => a.name.localeCompare(b.name));
   const metaAsset = rel.assets.find((a) => a.name.endsWith(".meta.json"));
   const meta = metaAsset ? await fetchMeta(metaAsset.browser_download_url) : null;
 
-  const video = document.createElement("video");
-  video.controls = true;
-  video.preload = "metadata";
-  if (mp4) video.src = mp4.browser_download_url;
-  card.appendChild(video);
+  if (mp4) {
+    const video = document.createElement("video");
+    video.controls = true;
+    video.preload = "metadata";
+    video.src = mp4.browser_download_url;
+    card.appendChild(video);
+  } else if (imageAssets.length) {
+    const carousel = document.createElement("div");
+    carousel.className = "carousel";
+    for (const a of imageAssets) {
+      const img = document.createElement("img");
+      img.src = a.browser_download_url;
+      img.loading = "lazy";
+      img.alt = a.name;
+      carousel.appendChild(img);
+    }
+    card.appendChild(carousel);
+  }
 
   const body = document.createElement("div");
   body.className = "card-body";
+
+  const mediaBadge = document.createElement("div");
+  mediaBadge.className = "media-type";
+  mediaBadge.textContent = mp4 ? "🎞 Reels" : imageAssets.length ? `🖼 カルーセル(${imageAssets.length}枚)` : "";
+  if (mediaBadge.textContent) body.appendChild(mediaBadge);
 
   if (mode === "queued") {
     const badge = document.createElement("div");
@@ -362,7 +401,8 @@ async function renderCard(rel, mode, queuePosition) {
 
   const metaLine = document.createElement("div");
   metaLine.className = "card-meta";
-  metaLine.textContent = `作成: ${formatDate(rel.created_at)}${mp4 ? ` / ${(mp4.size / 1024 / 1024).toFixed(1)}MB` : ""}`;
+  const totalBytes = mp4 ? mp4.size : imageAssets.reduce((sum, a) => sum + a.size, 0);
+  metaLine.textContent = `作成: ${formatDate(rel.created_at)}${totalBytes ? ` / ${(totalBytes / 1024 / 1024).toFixed(1)}MB` : ""}`;
   body.appendChild(metaLine);
 
   const captionBox = document.createElement("div");
