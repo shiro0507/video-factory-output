@@ -6,17 +6,22 @@ Instagram Reels へ自動投稿するためのリポジトリ。
 ## 仕組み
 
 ```
-GCP Cloud Run Job                     このリポジトリ                    GitHub Actions
-────────────────────                  ──────────────────                ─────────────────────
-台本取得→生成→レンダリング   ─→  Release を作成し             ─→  (release: published)
-                                   output-*.mp4 と                    .meta.json を読む
-                                   *.meta.json をアセット添付           mp4 の公開URLを解決
-                                                                       Instagram Graph API で投稿
+GCP Cloud Run Job                このリポジトリ                人間                GitHub Actions
+────────────────────             ──────────────────            ────                ─────────────────────
+台本取得→生成→レンダリング ─→ Release をdraft作成    ─→  内容確認         ─→  (release: published)
+                                output-*.mp4 と            "Publish release"        .meta.json を読む
+                                *.meta.json をアセット添付                          mp4の公開URLを解決
+                                                                                    Instagram Graph APIで投稿
 ```
 
 - レンダリングの重い処理は GCP、投稿は Actions に分離
 - 動画の受け渡しは **Release アセット**（公開リポジトリなので mp4 の
   ダウンロードURLがそのまま Instagram の `video_url` に使える）
+- **公開前に人間のレビューを挟む**: GCP側は Release を **draft** のまま作成する
+  （`GITHUB_RELEASE_AUTO_PUBLISH=true` を指定しない限り自動publishしない）。
+  [Releases](../../releases) で draft を開き、動画とキャプションを確認して
+  問題なければ **Publish release** を押すとその場で Actions が発火して投稿される。
+  却下する場合は draft を削除すればよい（投稿は発生しない）。
 
 ## Release に添付するもの（GCP 側が生成）
 
