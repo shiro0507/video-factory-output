@@ -3,13 +3,19 @@ name: daily-batch-publish
 # 承認済みキュー(draft=true & prerelease=true)の中から最も古い1件だけを
 # publishする。publish自体がrelease:publishedイベントを発火するので、
 # 実際のInstagram投稿は既存の publish.yml がそのまま担当する。
+#
+# 注意点(必ず維持すること):
+# 1. 対象の特定・publishともに release id を使う(tag_nameは使わない)。
+#    draft中のtag_nameはGitHubが割り当てる仮名("untagged-xxxx")を返す仕様で、
+#    これを publish 時に指定すると仮名がそのまま本タグとして確定してしまう。
+# 2. publish操作は secrets.RELEASE_PAT(fine-grained PAT)を使うこと。
+#    デフォルトの github.token(GITHUB_TOKEN) で発生させたイベントは
+#    無限ループ防止のため他のワークフローを再トリガーしない仕様があり、
+#    github.token でpublishすると publish.yml(Instagram投稿)が起動しない。
 on:
   schedule:
     - cron: "0 0 * * *" # 毎日 00:00 UTC = 09:00 JST
   workflow_dispatch: {}
-
-permissions:
-  contents: write
 
 jobs:
   publish-next:
@@ -19,25 +25,24 @@ jobs:
       - name: 承認済みキューから最古の1件を選ぶ
         id: pick
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           set -euo pipefail
-          TAG=$(gh api "repos/${{ github.repository }}/releases" --paginate \
-            --jq '[.[] | select(.draft==true and .prerelease==true)] | sort_by(.created_at) | .[0].tag_name // empty')
-          if [ -z "$TAG" ]; then
+          ID=$(gh api "repos/${{ github.repository }}/releases" --paginate \
+            --jq '[.[] | select(.draft==true and .prerelease==true)] | sort_by(.created_at) | .[0].id // empty')
+          if [ -z "$ID" ]; then
             echo "承認済みキューは空です。今日は何もしません。"
-            echo "tag=" >> "$GITHUB_OUTPUT"
+            echo "id=" >> "$GITHUB_OUTPUT"
           else
-            echo "投稿対象: $TAG"
-            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            echo "投稿対象 release id: $ID"
+            echo "id=$ID" >> "$GITHUB_OUTPUT"
           fi
 
       - name: publish(→ publish.ymlが検知してInstagram投稿)
-        if: steps.pick.outputs.tag != ''
+        if: steps.pick.outputs.id != ''
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           set -euo pipefail
-          gh release edit "${{ steps.pick.outputs.tag }}" \
-            --repo "${{ github.repository }}" \
-            --draft=false --prerelease=false
+          gh api "repos/${{ github.repository }}/releases/${{ steps.pick.outputs.id }}" \
+            -X PATCH -F draft=false -F prerelease=false
