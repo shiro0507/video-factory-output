@@ -10,14 +10,19 @@ GitHub Actions から Instagram へ自動投稿するためのリポジトリ。
 GCP Cloud Run Job          このリポジトリ                 レビューUI(人間)              日次バッチ(毎日9:00 JST)      GitHub Actions
 ────────────────────       ──────────────────             ────────────────             ─────────────────────       ─────────────────────
 台本取得→生成→レンダリング ─→ Release をdraft作成   ─→  目視確認・承認          ─→  承認済みキューから    ─→  (release: published)
-                            output-*.mp4 と            draft=true,                  最古の1件をpublish          .meta.json を読む
-                            *.meta.json を添付         prerelease=true に            (draft=false)              mp4の公開URLを解決
+                            output-*.mp4 と            draft=true,                  最古の1件をpublish          bodyのjsonを読む
+                            bodyにmeta埋め込み         prerelease=true に            (draft=false)              mp4の公開URLを解決
                                                         (=投稿待ちキュー)                                        Instagram Graph APIで投稿
 ```
 
 - レンダリングの重い処理は GCP、投稿は Actions に分離
 - 動画の受け渡しは **Release アセット**（公開リポジトリなので mp4 の
   ダウンロードURLがそのまま Instagram の `video_url` に使える）
+- ⚠️ Releaseアセットの実体（Azure Blob Storageへのリダイレクト先）はCORS非対応で、
+  ブラウザの`fetch()`からは公開済みでも読めない。動画/画像プレビューは
+  `<video>`/`<img>`のネイティブ要素で読み込む（CORSの制約を受けない）ため、
+  **draft中はレビューUIを開くブラウザでgithub.comにログインしている必要がある**
+  （このリポジトリへのアクセス権を持つアカウントで）。publish後は認証不要で見える
 - **公開前に人間のレビュー + 投稿頻度の平準化を挟む**（3段階のライフサイクル）:
   1. GCP側は Release を **draft**（`draft=true, prerelease=false`）のまま作成する
      （`GITHUB_RELEASE_AUTO_PUBLISH=true` を指定しない限り自動publishしない）
@@ -33,15 +38,15 @@ GCP Cloud Run Job          このリポジトリ                 レビューUI(
 
 ## Release に添付するもの（GCP 側 / アップロードスクリプトが生成）
 
-| ファイル | 内容 |
+| 場所 | 内容 |
 |---|---|
-| `output-<timestamp>.mp4` | Reels用動画（9:16推奨、最長15分/1GB以内） |
-| `slide-01.jpg` 〜 `slide-10.jpg` | カルーセル用画像（2〜10枚、ファイル名の連番＝表示順） |
-| `<任意>.meta.json` | 投稿メタデータ（下記スキーマ） |
+| アセット: `output-<timestamp>.mp4` | Reels用動画（9:16推奨、最長15分/1GB以内） |
+| アセット: `slide-01.jpg` 〜 `slide-10.jpg` | カルーセル用画像（2〜10枚、ファイル名の連番＝表示順） |
+| **本文(body)**: `` ```json ... ``` `` ブロック | 投稿メタデータ（下記スキーマ）。アセットではなくbodyに埋め込む(理由は上記CORSの注意点を参照) |
 
 1つの Release には mp4 か 画像群 のどちらか一方のみを添付する（混在不可）。
 
-### `.meta.json` スキーマ
+### メタデータ(Release本文に埋め込むjson)のスキーマ
 
 ```json
 {

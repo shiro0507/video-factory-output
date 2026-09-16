@@ -34,10 +34,18 @@ jobs:
           set -euo pipefail
           echo "対象タグ: $TAG"
 
-          # .meta.json を取得
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" \
-            --pattern "*.meta.json" --dir meta --clobber
-          META=$(ls meta/*.meta.json | head -1)
+          # メタデータはアセットではなくRelease本文(body)の```json```ブロックに入っている
+          # (アセット実体はCORS非対応でレビューUIのfetch()から読めないため body に埋め込む運用にしている)
+          mkdir -p meta
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > release_body.txt
+          node -e '
+            const fs = require("fs");
+            const body = fs.readFileSync("release_body.txt", "utf8");
+            const m = body.match(/```json\n([\s\S]*?)\n```/);
+            if (!m) { console.error("::error::Release本文にmetaのjsonブロックが見つかりません"); process.exit(1); }
+            fs.writeFileSync("meta/extracted.meta.json", m[1]);
+          '
+          META=meta/extracted.meta.json
 
           MEDIA_TYPE=$(node -e '
             const fs = require("fs");

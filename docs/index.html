@@ -115,13 +115,6 @@
     font-size: 0.75rem;
     color: var(--muted);
   }
-  .media-loading {
-    padding: 40px 0;
-    text-align: center;
-    color: var(--muted);
-    font-size: 0.8rem;
-    background: #000;
-  }
   .card-body {
     padding: 14px;
     display: flex;
@@ -209,7 +202,8 @@
 <body>
 
 <h1>投稿レビュー</h1>
-<div class="sub">shiro0507/video-factory-output — 動画を目視確認 → 承認済みキューへ。実際の投稿は毎日9:00(JST)の日次バッチが1件ずつ処理します。</div>
+<div class="sub">shiro0507/video-factory-output — 動画を目視確認 → 承認済みキューへ。実際の投稿は毎日9:00(JST)の日次バッチが1件ずつ処理します。<br>
+※ 動画/画像プレビューが表示されない場合、このブラウザで github.com に(リポジトリへアクセス権のあるアカウントで)ログインしてください(draft中のアセットはログイン無しでは読み込めません)。</div>
 
 <div id="tokenBar">
   <span class="hint">GitHub Personal Access Token（対象リポジトリの Contents: Read and write）。このブラウザにのみ保存されます。</span>
@@ -300,25 +294,15 @@ async function ghFetch(path, opts = {}) {
   return res.json();
 }
 
-// draft中のReleaseアセットは非公開(browser_download_urlを未ログインで直接fetchすると404)。
-// asset.url(api.github.com側)をPAT付きAccept:application/octet-streamで叩き、
-// 署名済みURLへのリダイレクトを経由してBlobとして取得する。
-async function fetchAssetBlob(asset) {
-  const token = getToken();
-  const res = await fetch(asset.url, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/octet-stream",
-    },
-  });
-  if (!res.ok) throw new Error(`アセット取得失敗 (${res.status}): ${asset.name}`);
-  return await res.blob();
-}
-
-async function fetchMeta(asset) {
+// 投稿メタデータ(caption等)はアセットではなくRelease本文(body)の```json```ブロックに
+// 埋め込まれている(アセット実体はCORS非対応でfetch()から読めないため。bodyは
+// /releases のJSONレスポンスに直接含まれるのでここでは追加リクエスト不要)。
+function parseMeta(body) {
+  if (!body) return null;
+  const m = body.match(/```json\n([\s\S]*?)\n```/);
+  if (!m) return null;
   try {
-    const blob = await fetchAssetBlob(asset);
-    return JSON.parse(await blob.text());
+    return JSON.parse(m[1]);
   } catch {
     return null;
   }
@@ -378,57 +362,28 @@ async function renderCard(rel, mode, queuePosition) {
   const imageAssets = rel.assets
     .filter((a) => /\.(jpe?g|png)$/i.test(a.name))
     .sort((a, b) => a.name.localeCompare(b.name));
-  const metaAsset = rel.assets.find((a) => a.name.endsWith(".meta.json"));
-  const meta = metaAsset ? await fetchMeta(metaAsset) : null;
+  const meta = parseMeta(rel.body);
 
+  // ネイティブの<video>/<img>要素で読み込む(fetch()と違いCORSの制約を受けない)。
+  // draft中はブラウザがgithub.com(このアセットへのアクセス権を持つアカウント)に
+  // ログイン済みである必要がある。ログインしていないと404になる。
   if (mp4) {
-    const loading = document.createElement("div");
-    loading.className = "media-loading";
-    loading.textContent = "動画を読み込み中...";
-    card.appendChild(loading);
-
     const video = document.createElement("video");
     video.controls = true;
+    video.preload = "metadata";
+    video.src = mp4.browser_download_url;
     card.appendChild(video);
-
-    fetchAssetBlob(mp4)
-      .then((blob) => {
-        video.src = URL.createObjectURL(blob);
-        loading.remove();
-      })
-      .catch((e) => {
-        loading.textContent = `動画の読み込みに失敗しました: ${e.message}`;
-      });
   } else if (imageAssets.length) {
-    const loading = document.createElement("div");
-    loading.className = "media-loading";
-    loading.textContent = "画像を読み込み中...";
-    card.appendChild(loading);
-
     const carousel = document.createElement("div");
     carousel.className = "carousel";
+    for (const a of imageAssets) {
+      const img = document.createElement("img");
+      img.src = a.browser_download_url;
+      img.loading = "lazy";
+      img.alt = a.name;
+      carousel.appendChild(img);
+    }
     card.appendChild(carousel);
-
-    Promise.all(
-      imageAssets.map((a) =>
-        fetchAssetBlob(a)
-          .then((blob) => ({ url: URL.createObjectURL(blob), name: a.name }))
-          .catch(() => null)
-      )
-    ).then((results) => {
-      loading.remove();
-      const ok = results.filter(Boolean);
-      if (ok.length === 0) {
-        carousel.textContent = "画像の読み込みに失敗しました";
-        return;
-      }
-      for (const r of ok) {
-        const img = document.createElement("img");
-        img.src = r.url;
-        img.alt = r.name;
-        carousel.appendChild(img);
-      }
-    });
   }
 
   const body = document.createElement("div");
