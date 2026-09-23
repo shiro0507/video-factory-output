@@ -215,7 +215,7 @@
 <body>
 
 <h1>投稿レビュー</h1>
-<div class="sub">shiro0507/video-factory-output — 動画を目視確認 → 承認済みキューへ。実際の投稿は毎日9:00(JST)の日次バッチが1件ずつ処理します。<br>
+<div class="sub">shiro0507/video-factory-output — 動画を目視確認 → 承認済みキューへ。実際の投稿は毎日5:00(JST)ごろ起動の日次バッチが1件ずつ処理します。<br>
 ※ GitHubの仕様上、動画/画像はブラウザ内で再生・表示できない場合があります。その場合は「ダウンロードして確認」リンクから確認してください。<br>
 ※ draft中のダウンロードには、このブラウザで github.com に(リポジトリへアクセス権のあるアカウントで)ログインしている必要があります。</div>
 
@@ -238,7 +238,7 @@
 <div id="pendingGrid" class="grid"></div>
 
 <h2>承認済み・投稿待ちキュー <span id="queueCount" class="count"></span></h2>
-<div class="section-sub">古い順に毎日9:00(JST)のバッチで1件ずつ投稿されます。先頭が次回の投稿対象です</div>
+<div class="section-sub">古い順に毎日5:00(JST)ごろ起動のバッチで1件ずつ投稿されます。先頭が次回の投稿対象です</div>
 <div id="queueGrid" class="grid"></div>
 
 <script>
@@ -478,7 +478,7 @@ async function renderCard(rel, mode, queuePosition) {
     approveBtn.className = "primary";
     approveBtn.textContent = "承認";
     approveBtn.addEventListener("click", async () => {
-      if (!confirm(`「${rel.name}」を承認済みキューに追加します。実際の投稿は次回の日次バッチ（毎日9:00 JST）です。よろしいですか？`)) return;
+      if (!confirm(`「${rel.name}」を承認済みキューに追加します。実際の投稿は次回の日次バッチ（毎日5:00 JSTごろ起動）です。よろしいですか？`)) return;
       setBusy(true, "更新中...");
       try {
         // tag_nameを明示しないと、draft中に一度でもPATCHすると

@@ -16,7 +16,9 @@ name: daily-batch-publish
 #    github.token でpublishすると publish.yml(Instagram投稿)が起動しない。
 on:
   schedule:
-    - cron: "0 0 * * *" # 毎日 00:00 UTC = 09:00 JST
+    # GitHubのscheduleはUTC固定かつ数時間遅れることがある(00:00 UTC指定で実際は~04:30 UTC起動が続いた)。
+    # 遅延込みで午前中に投稿されるよう前倒しして 20:00 UTC = 05:00 JST 指定にしている。
+    - cron: "0 20 * * *" # 毎日 20:00 UTC = 05:00 JST (実際の起動は遅れることがある)
   workflow_dispatch: {}
 
 jobs:

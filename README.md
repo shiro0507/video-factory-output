@@ -7,7 +7,7 @@ GitHub Actions から Instagram へ自動投稿するためのリポジトリ。
 ## 仕組み
 
 ```
-GCP Cloud Run Job          このリポジトリ                 レビューUI(人間)              日次バッチ(毎日9:00 JST)      GitHub Actions
+GCP Cloud Run Job          このリポジトリ                 レビューUI(人間)              日次バッチ(毎日5:00 JST〜)    GitHub Actions
 ────────────────────       ──────────────────             ────────────────             ─────────────────────       ─────────────────────
 台本取得→生成→レンダリング ─→ Release をdraft作成   ─→  目視確認・承認          ─→  承認済みキューから    ─→  (release: published)
                             output-*.mp4 と            draft=true,                  最古の1件をpublish          bodyのjsonを読む
@@ -35,7 +35,7 @@ GCP Cloud Run Job          このリポジトリ                 レビューUI(
   2. [レビューUI](https://shiro0507.github.io/video-factory-output/) で動画とキャプションを確認し、
      問題なければ「承認」→ `prerelease=true` になり**投稿待ちキュー**に入る
      （draftのままなのでこの時点ではまだ何も投稿されない）
-  3. 毎日9:00(JST)に `daily-batch-publish.yml` が実行され、キューの中から
+  3. 毎日5:00(JST)ごろ(GitHub側の遅延で数時間ずれることあり)に `daily-batch-publish.yml` が実行され、キューの中から
      **作成日時が最も古い1件だけ**を publish（`draft=false, prerelease=false`）。
      publishが `release:published` イベントを発火し、既存の `publish.yml` が
      Instagram投稿を実行する
