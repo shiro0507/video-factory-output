@@ -36,7 +36,7 @@ GCP Cloud Run Job          このリポジトリ                 レビューUI(
      問題なければ「承認」→ `prerelease=true` になり**投稿待ちキュー**に入る
      （draftのままなのでこの時点ではまだ何も投稿されない）
   3. 毎日5:00(JST)ごろ(GitHub側の遅延で数時間ずれることあり)に `daily-batch-publish.yml` が実行され、キューの中から
-     **作成日時が最も古い1件だけ**を publish（`draft=false, prerelease=false`）。
+     **投稿先アカウントごとに、作成日時が最も古い1件ずつ**を publish（`draft=false, prerelease=false`）。
      publishが `release:published` イベントを発火し、既存の `publish.yml` が
      Instagram投稿を実行する
   - 却下する場合はレビューUIの「却下して削除」（どの段階でも可）
@@ -59,9 +59,13 @@ GCP Cloud Run Job          このリポジトリ                 レビューUI(
   "caption": "投稿本文をここに。改行可。",
   "hashtags": ["旅行", "vlog", "#already_hashed_ok"],
   "media_type": "REELS",
-  "thumb_offset": 408
+  "thumb_offset": 408,
+  "account": "main"
 }
 ```
+
+- `account` は投稿先Instagramアカウント: `"main"`（既定・省略可）または `"neco"`（nemu_neco99）。
+  アップロード時に `IG_ACCOUNT=neco` を指定すると入る
 
 - `media_type` は `"REELS"`（既定・省略可）または `"CAROUSEL"`
 - `hashtags` の各要素は `#` 有無どちらでも可（ワークフローが付与）
@@ -74,7 +78,12 @@ GCP Cloud Run Job          このリポジトリ                 レビューUI(
 | Secret | 用途 |
 |---|---|
 | `INSTAGRAM_ACCESS_TOKEN` | Meta システムユーザーの無期限アクセストークン |
-| `INSTAGRAM_ACCOUNT_ID` | Instagram プロアカウントのユーザーID |
+| `INSTAGRAM_ACCOUNT_ID` | `main` アカウントのIGユーザーID |
+| `INSTAGRAM_ACCOUNT_ID_NECO` | `neco`（nemu_neco99）アカウントのIGユーザーID |
+
+トークンは全アカウント共通（同じシステムユーザーに各IGアカウントをアセットとして割り当て済み）。
+アカウントを増やすときは、Meta側でアセット割り当て → Secret追加 → `publish.yml`・`upload-to-github.mjs`・
+`docs/index.html` のアカウント一覧に追加。
 
 ## 手動実行
 

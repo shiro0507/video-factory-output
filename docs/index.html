@@ -128,6 +128,18 @@
     font-size: 0.75rem;
     color: var(--muted);
   }
+  .account {
+    align-self: flex-start;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid var(--muted);
+    border-radius: 6px;
+    padding: 1px 8px;
+  }
+  .account-neco {
+    border-color: #d58cff;
+    color: #d58cff;
+  }
   .card-body {
     padding: 14px;
     display: flex;
@@ -322,6 +334,13 @@ function parseMeta(body) {
   }
 }
 
+// 投稿先Instagramアカウント(meta.account。未指定の旧リリースは main)
+const ACCOUNT_LABELS = { main: "main", neco: "nemu_neco99" };
+function accountOf(rel) {
+  const meta = parseMeta(rel.body);
+  return (meta && meta.account) || "main";
+}
+
 function formatDate(iso) {
   try {
     return new Date(iso).toLocaleString("ja-JP");
@@ -357,8 +376,12 @@ async function loadReleases() {
     queueGrid.innerHTML = queued.length
       ? ""
       : `<div class="empty-state">投稿待ちキューは空です</div>`;
-    for (let i = 0; i < queued.length; i++) {
-      queueGrid.appendChild(await renderCard(queued[i], "queued", i + 1));
+    // 日次バッチはアカウントごとに最古1件ずつ投稿するので、順番もアカウント単位で数える
+    const posByAccount = {};
+    for (const rel of queued) {
+      const account = accountOf(rel);
+      posByAccount[account] = (posByAccount[account] || 0) + 1;
+      queueGrid.appendChild(await renderCard(rel, "queued", posByAccount[account]));
     }
 
     globalStatus.textContent = `合計${drafts.length}件`;
@@ -430,10 +453,16 @@ async function renderCard(rel, mode, queuePosition) {
   mediaBadge.textContent = mp4 ? "🎞 Reels" : imageAssets.length ? `🖼 カルーセル(${imageAssets.length}枚)` : "";
   if (mediaBadge.textContent) body.appendChild(mediaBadge);
 
+  const account = accountOf(rel);
+  const accountBadge = document.createElement("div");
+  accountBadge.className = `account account-${account}`;
+  accountBadge.textContent = `📮 投稿先: ${ACCOUNT_LABELS[account] || account}`;
+  body.appendChild(accountBadge);
+
   if (mode === "queued") {
     const badge = document.createElement("div");
     badge.className = "badge";
-    badge.textContent = queuePosition === 1 ? "次回投稿予定" : `${queuePosition}番目`;
+    badge.textContent = queuePosition === 1 ? `次回投稿予定(${account})` : `${account} の${queuePosition}番目`;
     body.appendChild(badge);
   }
 

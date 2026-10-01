@@ -55,6 +55,19 @@ jobs:
           echo "media_type=$MEDIA_TYPE" >> "$GITHUB_OUTPUT"
           echo "メディアタイプ: $MEDIA_TYPE"
 
+          # 投稿先アカウント(account 未指定の旧リリースは main 扱い)
+          ACCOUNT=$(node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            process.stdout.write(m.account || "main");
+          ' "$META")
+          case "$ACCOUNT" in
+            main|neco) ;;
+            *) echo "::error::未知の投稿先アカウントです: $ACCOUNT"; exit 1 ;;
+          esac
+          echo "account=$ACCOUNT" >> "$GITHUB_OUTPUT"
+          echo "投稿先アカウント: $ACCOUNT"
+
           if [ "$MEDIA_TYPE" = "CAROUSEL" ]; then
             # 画像アセットの公開ダウンロードURL(認証不要)をファイル名の昇順(=表示順)で取得
             IMAGE_URLS=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
@@ -103,9 +116,11 @@ jobs:
           echo "thumb_offset=$THUMB_OFFSET" >> "$GITHUB_OUTPUT"
 
       - name: Instagram へ投稿(Reels or カルーセル)
+        # トークンは全アカウント共通(同一システムユーザーに各IGアカウントをアセット割り当て済み)。
+        # アカウントごとに変わるのはIGアカウントIDのみ。
         env:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
-          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          INSTAGRAM_ACCOUNT_ID: ${{ steps.rel.outputs.account == 'neco' && secrets.INSTAGRAM_ACCOUNT_ID_NECO || secrets.INSTAGRAM_ACCOUNT_ID }}
           MEDIA_TYPE: ${{ steps.rel.outputs.media_type }}
           VIDEO_URL: ${{ steps.rel.outputs.video_url }}
           IMAGE_URLS: ${{ steps.rel.outputs.image_urls }}

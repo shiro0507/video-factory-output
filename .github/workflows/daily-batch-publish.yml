@@ -1,7 +1,7 @@
 name: daily-batch-publish
 
-# 承認済みキュー(draft=true & prerelease=true)の中から最も古い1件だけを
-# publishする。publish自体がrelease:publishedイベントを発火するので、
+# 承認済みキュー(draft=true & prerelease=true)の中から、投稿先アカウント
+# (Release本文metaの account。未指定は main)ごとに最も古い1件ずつをpublishする。publish自体がrelease:publishedイベントを発火するので、
 # 実際のInstagram投稿は既存の publish.yml がそのまま担当する。
 #
 # 注意点(必ず維持すること):
@@ -26,30 +26,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: 承認済みキューから最古の1件を選ぶ
-        id: pick
+      # 投稿先アカウント(Release本文metaの account。未指定は main)ごとに、
+      # 承認済みキューの最古1件ずつをpublishする(=各アカウント1日1投稿)。
+      - name: アカウントごとに承認済みキューの最古1件をpublish(→ publish.ymlがInstagram投稿)
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: |
           set -euo pipefail
-          PICKED=$(gh api "repos/${{ github.repository }}/releases" --paginate \
-            --jq '[.[] | select(.draft==true and .prerelease==true)] | sort_by(.created_at) | .[0] | "\(.id)\t\(.name)"')
+          PICKED=$(gh api "repos/${{ github.repository }}/releases" --paginate --slurp | jq -r '
+            [.[][] | select(.draft==true and .prerelease==true)
+              | . + {account: ((.body // "" | capture("```json\n(?<j>[\\s\\S]*?)\n```").j | (try fromjson catch {}) | .account) // "main")}]
+            | sort_by(.created_at) | group_by(.account) | map(.[0])
+            | .[] | "\(.id)\t\(.name)\t\(.account)"')
           if [ -z "$PICKED" ]; then
             echo "承認済みキューは空です。今日は何もしません。"
-            echo "id=" >> "$GITHUB_OUTPUT"
-          else
-            ID=$(echo "$PICKED" | cut -f1)
-            NAME=$(echo "$PICKED" | cut -f2)
-            echo "投稿対象 release id=$ID name=$NAME"
-            echo "id=$ID" >> "$GITHUB_OUTPUT"
-            echo "name=$NAME" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
-
-      - name: publish(→ publish.ymlが検知してInstagram投稿)
-        if: steps.pick.outputs.id != ''
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
-        run: |
-          set -euo pipefail
-          gh api "repos/${{ github.repository }}/releases/${{ steps.pick.outputs.id }}" \
-            -X PATCH -F draft=false -F prerelease=false -f "tag_name=${{ steps.pick.outputs.name }}"
+          while IFS=$'\t' read -r ID NAME ACCOUNT; do
+            echo "投稿対象 account=$ACCOUNT release id=$ID name=$NAME"
+            gh api "repos/${{ github.repository }}/releases/$ID" \
+              -X PATCH -F draft=false -F prerelease=false -f "tag_name=$NAME" > /dev/null
+          done <<< "$PICKED"
