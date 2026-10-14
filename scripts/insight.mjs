@@ -74,6 +74,7 @@ async function getReelsData() {
     (m) => (m.media_type === "VIDEO" || m.media_type === "REEL") && m.media_product_type === "REELS",
   );
   const stats = {};
+  let failed = 0;
   for (const m of reels) {
     const { json } = await get(
       `${BASE}/${m.id}/insights?metric=${METRICS}&period=lifetime&access_token=${encodeURIComponent(TOKEN)}`,
@@ -85,13 +86,19 @@ async function getReelsData() {
         else if ("value" in d) metrics[d.name] = d.value;
       }
     } else {
+      // 取得失敗を空のスナップショットとして記録すると、同日の再実行で上書きできなくなるので記録しない
       console.warn(`[WARN] ${m.id} のインサイトなし: ${json.error?.message || "unknown error"}`);
+      failed++;
+      continue;
     }
     stats[m.id] = {
       caption: [...(m.caption || "")].slice(0, 30).join(""),
       created_at: m.timestamp,
       metrics,
     };
+  }
+  if (reels.length && failed === reels.length) {
+    die(`全${reels.length}件のReelsでインサイトを取得できませんでした(トークンに instagram_manage_insights 権限があるか確認)`);
   }
   return stats;
 }
