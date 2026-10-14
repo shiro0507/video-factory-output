@@ -111,3 +111,16 @@ IMAGE_URLS='https://example.com/1.jpg,https://example.com/2.jpg' \
 CAPTION='テスト投稿' \
 node scripts/publish-instagram.mjs
 ```
+
+## インサイト収集
+
+`insight.yml` が毎日06:00 JSTごろ、各アカウントの投稿済みReelsのインサイト（lifetimeの
+views / reach / saved / total_interactions / likes / comments / shares）とフォロワー数を取得し、
+日次スナップショットとして追記・コミットする（形式は `shiro0507/ig_post` の `data/insta_stats.json` と同じ）。
+
+| アカウント | 出力先 |
+|---|---|
+| `main` | `data/insta_stats.json` |
+| `neco` | `data/insta_stats_neco.json` |
+
+手動実行: `gh workflow run insight.yml`（同じ日付のスナップショットがあれば追記しない）

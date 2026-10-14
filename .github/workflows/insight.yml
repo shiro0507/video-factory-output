@@ -1,0 +1,48 @@
+name: collect-instagram-insights
+
+# 投稿済みReelsのインサイト + フォロワー数を毎日1回スナップショットして
+# data/ 配下のJSONに追記・コミットする(形式は shiro0507/ig_post の insta_stats.json を踏襲)。
+# アカウントごとに別ファイル: main → data/insta_stats.json / neco → data/insta_stats_neco.json
+on:
+  schedule:
+    - cron: "0 21 * * *" # 21:00 UTC = 06:00 JST (GitHub側の遅延で数時間ずれることあり)
+  workflow_dispatch: {}
+
+concurrency:
+  group: insight
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: main のインサイト取得
+        env:
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          STATS_FILE: data/insta_stats.json
+        run: node scripts/insight.mjs
+
+      - name: neco のインサイト取得
+        env:
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID_NECO }}
+          STATS_FILE: data/insta_stats_neco.json
+        run: node scripts/insight.mjs
+
+      - name: 更新したJSONをコミット
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet || git commit -m "chore: update insta_stats $(TZ=Asia/Tokyo date +%Y-%m-%d)"
+          git push
