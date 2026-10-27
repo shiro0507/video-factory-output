@@ -222,11 +222,59 @@
     white-space: pre-wrap;
   }
   a { color: var(--accent); }
+
+  /* --- タブ --- */
+  .tabs { display: flex; gap: 4px; margin: 4px 0 16px; border-bottom: 1px solid var(--border); }
+  .tabs a {
+    padding: 8px 14px; color: var(--muted); text-decoration: none;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; font-size: 0.9rem;
+  }
+  .tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+
+  /* --- ダッシュボード --- */
+  .viz {
+    /* 系列色: dataviz既定パレットのダーク版(背景#1a1d24でCVD/コントラスト検証済み) */
+    --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500;
+    --series-muted: #4a4f5a; --grid: #2a2e37; --axis: #9aa0aa;
+  }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; color: var(--muted); }
+  .seg button[aria-pressed="true"] { background: #2b3040; color: var(--text); font-weight: 600; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .tile { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+  .tile .label { color: var(--muted); font-size: 0.75rem; }
+  .tile .value { font-size: 1.6rem; font-weight: 600; margin-top: 2px; }
+  .tile .note { color: var(--muted); font-size: 0.75rem; margin-top: 2px; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+  .panel h3 { font-size: 0.95rem; margin: 0 0 4px; }
+  .panel-sub { color: var(--muted); font-size: 0.75rem; margin-bottom: 10px; }
+  .chart-box { position: relative; height: 220px; }
+  .chart-box.tall { height: 320px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 0.8rem; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; flex: 0 0 auto; }
+  .table-wrap { overflow-x: auto; }
+  table.posts { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  table.posts th, table.posts td { padding: 7px 8px; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+  table.posts th { color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; }
+  table.posts th.num, table.posts td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.posts td.cap { white-space: normal; min-width: 180px; max-width: 320px; }
+  table.posts th[aria-sort="ascending"]::after { content: " ▲"; }
+  table.posts th[aria-sort="descending"]::after { content: " ▼"; }
+  table.posts tr:hover td { background: #1f232c; }
+  table.posts td.pick label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
 
-<h1>投稿レビュー</h1>
+<h1>video-factory-output</h1>
+<nav class="tabs">
+  <a href="#review" id="tabReview">投稿レビュー</a>
+  <a href="#dashboard" id="tabDash">ダッシュボード</a>
+</nav>
+
+<div id="reviewView">
 <div class="sub">shiro0507/video-factory-output — 動画を目視確認 → 承認済みキューへ。実際の投稿は毎日5:00(JST)ごろ起動の日次バッチが1件ずつ処理します。<br>
 ※ GitHubの仕様上、動画/画像はブラウザ内で再生・表示できない場合があります。その場合は「ダウンロードして確認」リンクから確認してください。<br>
 ※ draft中のダウンロードには、このブラウザで github.com に(リポジトリへアクセス権のあるアカウントで)ログインしている必要があります。</div>
@@ -252,6 +300,39 @@
 <h2>承認済み・投稿待ちキュー <span id="queueCount" class="count"></span></h2>
 <div class="section-sub">古い順に毎日5:00(JST)ごろ起動のバッチで1件ずつ投稿されます。先頭が次回の投稿対象です</div>
 <div id="queueGrid" class="grid"></div>
+</div>
+
+<div id="dashView" class="viz" hidden>
+  <div class="toolbar">
+    <div class="seg" id="acctSeg">
+      <button data-acct="main" aria-pressed="true">main（task_bunkai）</button>
+      <button data-acct="neco" aria-pressed="false">neco（nemu_neco99）</button>
+    </div>
+    <button id="dashRefreshBtn">再読み込み</button>
+    <span id="dashStatus" class="status"></span>
+  </div>
+  <div id="dashError"></div>
+  <div id="tiles" class="tiles"></div>
+
+  <section class="panel">
+    <h3>フォロワー数の推移</h3>
+    <div class="chart-box"><canvas id="followerChart" aria-label="フォロワー数の推移"></canvas></div>
+  </section>
+
+  <section class="panel">
+    <h3>投稿後の伸び方（views・累計）</h3>
+    <div class="panel-sub">横軸は投稿日からの日数。下の表のチェックで最大4件を色付きで表示（既定は新しい順に3件）、それ以外は灰色の線。<br>
+      記録は2026-10-14開始のため、それ以前の投稿は途中の日数から線が始まります。</div>
+    <div class="chart-box tall"><canvas id="growthChart" aria-label="投稿後の日数ごとのviews"></canvas></div>
+    <div id="growthLegend" class="legend"></div>
+  </section>
+
+  <section class="panel">
+    <h3>投稿一覧（最新の累計値）</h3>
+    <div class="panel-sub">列名をクリックで並べ替え。保存率 = 保存 ÷ reach。</div>
+    <div class="table-wrap"><table class="posts" id="postTable"></table></div>
+  </section>
+</div>
 
 <script>
 const REPO = "shiro0507/video-factory-output";
@@ -576,6 +657,256 @@ async function renderCard(rel, mode, queuePosition) {
 
 if (getToken()) loadReleases();
 else showError("上部にGitHubトークンを入力・保存してください。");
+</script>
+<script>
+// ===== ダッシュボード(インサイト) =====
+// データ: insight.yml が毎朝コミットする data/insta_stats*.json を raw.githubusercontent.com から直接取得
+// (公開リポジトリ + CORS許可済みなのでトークン不要。CDNキャッシュで最大5分遅れる)
+const STATS_FILES = { main: "insta_stats.json", neco: "insta_stats_neco.json" };
+const MAX_PICK = 4;
+const dash = { acct: "main", cache: {}, picks: { main: null, neco: null }, sort: { key: "postDate", dir: -1 }, charts: {} };
+
+const cssVar = (name) => getComputedStyle($("#dashView")).getPropertyValue(name).trim();
+const SLOT_VARS = ["--series-1", "--series-2", "--series-3", "--series-4"];
+
+// "2026-10-13T23:29:28+0000" の "+0000" はSafariがパースできないので "+00:00" に直す
+const parseIso = (iso) => new Date(iso.replace(/([+-]\d{2})(\d{2})$/, "$1:$2"));
+const jstDate = (d) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Asia/Tokyo" }).format(d);
+const dayDiff = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
+const fmt = (n) => (n == null ? "—" : Number(n).toLocaleString("ja-JP"));
+const oneLine = (s) => (s || "").replace(/\s+/g, " ").trim();
+
+function route() {
+  const isDash = location.hash === "#dashboard";
+  $("#reviewView").hidden = isDash;
+  $("#dashView").hidden = !isDash;
+  $("#tabReview").toggleAttribute("aria-current", !isDash);
+  $("#tabDash").toggleAttribute("aria-current", isDash);
+  if (isDash) { $("#tabDash").setAttribute("aria-current", "page"); loadDash(); }
+  else $("#tabReview").setAttribute("aria-current", "page");
+}
+window.addEventListener("hashchange", route);
+
+$("#acctSeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-acct]");
+  if (!b) return;
+  dash.acct = b.dataset.acct;
+  for (const x of $("#acctSeg").querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b));
+  loadDash();
+});
+$("#dashRefreshBtn").addEventListener("click", () => { delete dash.cache[dash.acct]; loadDash(); });
+
+async function loadDash() {
+  const acct = dash.acct;
+  $("#dashError").innerHTML = "";
+  try {
+    if (!dash.cache[acct]) {
+      $("#dashStatus").textContent = "読み込み中...";
+      const url = `https://raw.githubusercontent.com/${REPO}/main/data/${STATS_FILES[acct]}?t=${Date.now()}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`データ取得エラー (${res.status}): ${url}`);
+      dash.cache[acct] = normalize(await res.json());
+    }
+    const d = dash.cache[acct];
+    const lastDate = d.followers.at(-1)?.date || "—";
+    $("#dashStatus").textContent = `最終記録: ${lastDate}（毎朝6:00 JSTごろ更新）`;
+    renderDash(d);
+  } catch (e) {
+    $("#dashStatus").textContent = "";
+    $("#dashError").innerHTML = `<div class="error">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function normalize(raw) {
+  const followers = (raw.follower_history || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+  const posts = Object.entries(raw)
+    .filter(([k]) => k !== "follower_history")
+    .map(([id, v]) => {
+      const created = parseIso(v.created_at);
+      const postDate = jstDate(created);
+      const history = (v.history || []).filter((h) => h.views != null).sort((a, b) => a.date.localeCompare(b.date));
+      const l = history.at(-1) || {};
+      return {
+        id, caption: oneLine(v.caption), created, postDate, history,
+        views: l.views, reach: l.reach, likes: l.likes, comments: l.comments, saved: l.saved, shares: l.shares,
+        saveRate: l.reach ? l.saved / l.reach : null,
+        days: history.length,
+      };
+    })
+    .sort((a, b) => b.created - a.created);
+  return { followers, posts };
+}
+
+// 色は「選ばれた投稿」に固定で紐づける(並べ替えや選択解除で他の投稿の色が変わらないよう、空いている最小スロットを使う)
+function getPicks(d) {
+  if (!dash.picks[dash.acct]) {
+    const m = new Map();
+    d.posts.filter((p) => p.history.length).slice(0, 3).forEach((p, i) => m.set(p.id, i));
+    dash.picks[dash.acct] = m;
+  }
+  return dash.picks[dash.acct];
+}
+function togglePick(id) {
+  const m = dash.picks[dash.acct];
+  if (m.has(id)) m.delete(id);
+  else if (m.size < MAX_PICK) {
+    const used = new Set(m.values());
+    m.set(id, [0, 1, 2, 3].find((i) => !used.has(i)));
+  }
+  renderDash(dash.cache[dash.acct]);
+}
+
+function renderDash(d) {
+  renderTiles(d);
+  renderFollowerChart(d);
+  renderGrowthChart(d);
+  renderTable(d);
+}
+
+function renderTiles(d) {
+  const f = d.followers;
+  const cur = f.at(-1)?.followers_count;
+  const weekAgo = f.find((h) => dayDiff(h.date, f.at(-1).date) <= 7);
+  const delta = cur != null && weekAgo ? cur - weekAgo.followers_count : null;
+  const totViews = d.posts.reduce((s, p) => s + (p.views || 0), 0);
+  const totReach = d.posts.reduce((s, p) => s + (p.reach || 0), 0);
+  const totSaved = d.posts.reduce((s, p) => s + (p.saved || 0), 0);
+  const tiles = [
+    ["フォロワー", fmt(cur), delta == null ? "" : `直近7日 ${delta >= 0 ? "+" : ""}${delta}`],
+    ["Reels数", fmt(d.posts.length), ""],
+    ["views合計(累計)", fmt(totViews), ""],
+    ["保存率(全体)", totReach ? `${((totSaved / totReach) * 100).toFixed(1)}%` : "—", `保存 ${fmt(totSaved)} / reach ${fmt(totReach)}`],
+  ];
+  $("#tiles").innerHTML = tiles.map(([l, v, n]) =>
+    `<div class="tile"><div class="label">${l}</div><div class="value">${v}</div><div class="note">${n}</div></div>`).join("");
+}
+
+function baseOptions() {
+  return {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "nearest", intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: { backgroundColor: "#0f1115", borderColor: cssVar("--grid"), borderWidth: 1, titleColor: "#e8eaed", bodyColor: "#e8eaed", padding: 10 },
+    },
+    scales: {
+      x: { grid: { display: false }, border: { color: cssVar("--grid") }, ticks: { color: cssVar("--axis") } },
+      y: { beginAtZero: true, grid: { color: cssVar("--grid") }, border: { display: false }, ticks: { color: cssVar("--axis"), precision: 0 } },
+    },
+  };
+}
+function drawChart(key, canvas, config) {
+  if (typeof Chart === "undefined") throw new Error("グラフライブラリ(Chart.js)を読み込めませんでした");
+  dash.charts[key]?.destroy();
+  dash.charts[key] = new Chart(canvas, config);
+}
+
+function renderFollowerChart(d) {
+  const opts = baseOptions();
+  opts.interaction = { mode: "index", intersect: false };
+  opts.plugins.tooltip.callbacks = { label: (c) => `フォロワー ${fmt(c.parsed.y)}人` };
+  drawChart("followers", $("#followerChart"), {
+    type: "line",
+    data: {
+      labels: d.followers.map((h) => h.date.slice(5).replace("-", "/")),
+      datasets: [{ data: d.followers.map((h) => h.followers_count), borderColor: cssVar("--series-1"), backgroundColor: cssVar("--series-1"),
+        borderWidth: 2, pointRadius: d.followers.length > 30 ? 0 : 3, pointHoverRadius: 5, tension: 0 }],
+    },
+    options: opts,
+  });
+}
+
+function renderGrowthChart(d) {
+  const picks = getPicks(d);
+  const series = d.posts.filter((p) => p.history.length).map((p) => ({
+    p, slot: picks.get(p.id),
+    points: p.history.map((h) => ({ x: dayDiff(p.postDate, h.date), y: h.views })),
+  }));
+  const datasets = series
+    .sort((a, b) => (a.slot == null) - (b.slot == null)) // 色付きを先頭(=最前面)に
+    .map(({ p, slot, points }) => {
+      const on = slot != null;
+      const color = on ? cssVar(SLOT_VARS[slot]) : cssVar("--series-muted");
+      return {
+        label: `${p.postDate.slice(5).replace("-", "/")} ${p.caption.slice(0, 16)}`,
+        data: points, borderColor: color, backgroundColor: color,
+        borderWidth: on ? 2 : 1, pointRadius: on ? 3 : 0, pointHoverRadius: 5, tension: 0, order: on ? 0 : 1,
+      };
+    });
+  const opts = baseOptions();
+  opts.scales.x = { ...opts.scales.x, type: "linear", title: { display: true, text: "投稿からの日数", color: cssVar("--axis") }, ticks: { color: cssVar("--axis"), precision: 0, stepSize: 1 } };
+  opts.scales.y.title = { display: true, text: "views(累計)", color: cssVar("--axis") };
+  opts.plugins.tooltip.callbacks = {
+    title: (items) => `投稿${items[0].parsed.x}日目`,
+    label: (c) => `${c.dataset.label}: ${fmt(c.parsed.y)} views`,
+  };
+  drawChart("growth", $("#growthChart"), { type: "line", data: { datasets }, options: opts });
+
+  const picked = series.filter((s) => s.slot != null).sort((a, b) => a.slot - b.slot);
+  $("#growthLegend").innerHTML = picked.length
+    ? picked.map(({ p, slot }) => `<span><i class="swatch" style="background:var(${SLOT_VARS[slot]})"></i>${escapeHtml(p.postDate.slice(5).replace("-", "/") + " " + p.caption.slice(0, 20))} — ${fmt(p.views)} views</span>`).join("") +
+      `<span><i class="swatch" style="background:var(--series-muted)"></i>その他の投稿</span>`
+    : `<span class="panel-sub">表で投稿にチェックを入れると色付きで表示されます</span>`;
+}
+
+const COLS = [
+  { key: "pick", label: "グラフ", sortable: false },
+  { key: "postDate", label: "投稿日" },
+  { key: "caption", label: "キャプション" },
+  { key: "views", label: "views", num: true },
+  { key: "reach", label: "reach", num: true },
+  { key: "likes", label: "いいね", num: true },
+  { key: "comments", label: "コメント", num: true },
+  { key: "saved", label: "保存", num: true },
+  { key: "shares", label: "シェア", num: true },
+  { key: "saveRate", label: "保存率", num: true },
+  { key: "days", label: "記録日数", num: true },
+];
+
+function renderTable(d) {
+  const picks = getPicks(d);
+  const { key, dir } = dash.sort;
+  const rows = d.posts.slice().sort((a, b) => {
+    const x = a[key], y = b[key];
+    if (x == null && y == null) return 0;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    return (typeof x === "string" ? x.localeCompare(y) : x - y) * dir;
+  });
+  const head = `<thead><tr>${COLS.map((c) =>
+    `<th class="${c.num ? "num" : ""}" data-key="${c.key}"${c.key === key ? ` aria-sort="${dir > 0 ? "ascending" : "descending"}"` : ""}>${c.label}</th>`).join("")}</tr></thead>`;
+  const body = rows.map((p) => {
+    const slot = picks.get(p.id);
+    const full = picks.size >= MAX_PICK && slot == null;
+    const sw = slot != null ? `<i class="swatch" style="background:var(${SLOT_VARS[slot]})"></i>` : `<i class="swatch"></i>`;
+    const pick = p.history.length
+      ? `<label><input type="checkbox" data-id="${p.id}" ${slot != null ? "checked" : ""} ${full ? "disabled" : ""}>${sw}</label>`
+      : "";
+    return `<tr>
+      <td class="pick">${pick}</td>
+      <td>${p.postDate}</td>
+      <td class="cap">${escapeHtml(p.caption)}</td>
+      <td class="num">${fmt(p.views)}</td><td class="num">${fmt(p.reach)}</td>
+      <td class="num">${fmt(p.likes)}</td><td class="num">${fmt(p.comments)}</td>
+      <td class="num">${fmt(p.saved)}</td><td class="num">${fmt(p.shares)}</td>
+      <td class="num">${p.saveRate == null ? "—" : (p.saveRate * 100).toFixed(1) + "%"}</td>
+      <td class="num">${p.days}</td>
+    </tr>`;
+  }).join("");
+  const t = $("#postTable");
+  t.innerHTML = head + `<tbody>${body}</tbody>`;
+  t.querySelectorAll("th[data-key]").forEach((th) => {
+    if (th.dataset.key === "pick") return;
+    th.addEventListener("click", () => {
+      const k = th.dataset.key;
+      dash.sort = { key: k, dir: dash.sort.key === k ? -dash.sort.dir : (k === "caption" ? 1 : -1) };
+      renderTable(d);
+    });
+  });
+  t.querySelectorAll("input[type=checkbox][data-id]").forEach((cb) => cb.addEventListener("change", () => togglePick(cb.dataset.id)));
+}
+
+route();
 </script>
 </body>
 </html>
