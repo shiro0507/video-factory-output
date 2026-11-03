@@ -1,0 +1,76 @@
+name: post-x
+
+# data/x_queue.json(ダッシュボードの「X」タブで編集)の先頭から1日1件、X に動画投稿する。
+# キー(Secrets: X_API_KEY / X_API_SECRET / X_ACCESS_TOKEN / X_ACCESS_TOKEN_SECRET)が
+# 未設定の間は自動で dry-run になり、X には何も送らない。
+on:
+  schedule:
+    - cron: "0 12 * * *" # 12:00 UTC = 21:00 JST (GitHub側の遅延で数時間ずれることあり)
+  workflow_dispatch:
+    inputs:
+      item_id:
+        description: "投稿するアイテムのid(例 iginsight:2026-08-10)。空ならキュー先頭"
+        required: false
+        default: ""
+      dry_run:
+        description: "dry-run(Xに送信しない)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: x-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: X に投稿
+        id: post
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          ITEM_ID: ${{ inputs.item_id }}
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+          RESULT_FILE: ${{ runner.temp }}/x_result.json
+        run: node scripts/x-post.mjs post
+
+      - name: 結果をキューに反映してコミット
+        if: steps.post.outputs.ok != ''
+        env:
+          RESULT_FILE: ${{ runner.temp }}/x_result.json
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # 投稿中にダッシュボードからキューが更新されていても、最新を取り込んでから結果だけ反映する
+          for i in 1 2 3 4 5; do
+            git fetch -q origin main
+            git reset -q --hard origin/main
+            node scripts/x-post.mjs apply
+            git add data/x_queue.json
+            git diff --cached --quiet && exit 0
+            git commit -q -m "chore: x-post result $(TZ=Asia/Tokyo date +%Y-%m-%d)"
+            git push -q origin HEAD:main && exit 0
+            echo "push が競合したので再試行します ($i)"
+            sleep $((i * 3))
+          done
+          echo "::error::キューへの反映に失敗しました"
+          exit 1
+
+      - name: 投稿失敗ならジョブを失敗にする
+        if: steps.post.outputs.ok == 'false'
+        run: |
+          echo "::error::X への投稿に失敗しました。ダッシュボードの「X」タブで内容を確認し、再キューしてください。"
+          exit 1

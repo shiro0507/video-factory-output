@@ -264,6 +264,30 @@
   table.posts th[aria-sort="descending"]::after { content: " ▼"; }
   table.posts tr:hover td { background: #1f232c; }
   table.posts td.pick label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+
+  /* --- X投稿 --- */
+  textarea {
+    font: inherit; font-size: 0.85rem; line-height: 1.5; width: 100%; min-height: 120px; resize: vertical;
+    background: #12141a; border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 10px;
+  }
+  .xcount { font-size: 0.75rem; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+  .xcount.over { color: var(--danger); font-weight: 600; }
+  .xlist { display: flex; flex-direction: column; gap: 10px; }
+  .xitem { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .xitem-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
+  .xitem-head b { color: var(--text); }
+  .xitem .actions { flex-wrap: wrap; }
+  .xitem .actions button { flex: 0 0 auto; padding: 6px 12px; font-size: 0.8rem; }
+  .pill { font-size: 0.7rem; font-weight: 600; border-radius: 999px; padding: 2px 9px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
+  .pill.queued { border-color: var(--accent); color: var(--accent); }
+  .pill.posted { border-color: var(--ok); color: var(--ok); }
+  .pill.failed { border-color: var(--danger); color: var(--danger); }
+  .xerr { font-size: 0.75rem; color: var(--danger); white-space: pre-wrap; word-break: break-all; }
+  #xEditor { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 14px; }
+  #xEditor video { width: 100%; max-height: 360px; background: #000; border-radius: 8px; }
+  @media (max-width: 640px) { #xEditor { grid-template-columns: 1fr; } }
+  table.posts td.act button { padding: 4px 10px; font-size: 0.75rem; }
+  .filters { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); margin-bottom: 8px; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
@@ -273,6 +297,7 @@
 <nav class="tabs">
   <a href="#review" id="tabReview">投稿レビュー</a>
   <a href="#dashboard" id="tabDash">ダッシュボード</a>
+  <a href="#x" id="tabX">X投稿</a>
 </nav>
 
 <div id="reviewView">
@@ -329,6 +354,53 @@
     <h3>投稿一覧（最新の累計値）</h3>
     <div class="panel-sub">列名をクリックで並べ替え。保存率 = 保存 ÷ reach。</div>
     <div class="table-wrap"><table class="posts" id="postTable"></table></div>
+  </section>
+</div>
+
+<div id="xView" hidden>
+  <div class="sub">過去のInstagram投稿の動画を X に再利用します（テスト中: ig_insight → X）。キューの先頭から<b>毎日21:00(JST)ごろ1件</b>投稿されます。<br>
+    X のキー（Secrets: X_API_KEY / X_API_SECRET / X_ACCESS_TOKEN / X_ACCESS_TOKEN_SECRET）が未登録の間は dry-run になり、X には送信されません。<br>
+    キューの編集には「投稿レビュー」タブのGitHubトークンを使います（「今すぐ投稿」「dry-run」には トークンに Actions: Read and write 権限も必要）。</div>
+  <div class="toolbar">
+    <button id="xRefreshBtn">再読み込み</button>
+    <button id="xDryBtn">キュー先頭を dry-run</button>
+    <a id="xRunsLink" href="https://github.com/shiro0507/video-factory-output/actions/workflows/x-post.yml" target="_blank" rel="noopener">実行履歴</a>
+    <span id="xStatus" class="status"></span>
+  </div>
+  <div id="xError"></div>
+
+  <section class="panel" id="xEditorPanel" hidden>
+    <h3>キューに追加</h3>
+    <div class="panel-sub" id="xEditorSub"></div>
+    <div id="xEditor">
+      <div>
+        <video id="xVideo" controls preload="metadata" playsinline></video>
+        <a id="xVideoLink" class="panel-sub" target="_blank" rel="noopener">動画を別タブで開く</a>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <textarea id="xText" aria-label="Xの本文"></textarea>
+        <div id="xTextCount" class="xcount"></div>
+        <details><summary class="panel-sub" style="cursor:pointer">元のInstagramキャプション</summary><div id="xOrigCap" class="caption"></div></details>
+        <div class="actions"><button id="xAddBtn" class="primary">キューに追加</button><button id="xCancelBtn">閉じる</button></div>
+      </div>
+    </div>
+  </section>
+
+  <h2>Xキュー <span id="xQueueCount" class="count"></span></h2>
+  <div class="section-sub">上から順に投稿されます。本文はここで直接編集できます。</div>
+  <div id="xQueue" class="xlist"></div>
+
+  <h2>投稿履歴 <span id="xHistCount" class="count"></span></h2>
+  <div id="xHist" class="xlist"></div>
+
+  <section class="panel" style="margin-top:24px">
+    <h3>過去の投稿資産（ig_insight）</h3>
+    <div class="panel-sub">content/ フォルダの動画とInstagramの実績を突き合わせたもの。伸びた投稿から選ぶのがおすすめです。列名クリックで並べ替え。</div>
+    <div class="filters">
+      <label><input type="checkbox" id="xHideFuture" checked> IG未投稿（予約中）を隠す</label>
+      <label><input type="checkbox" id="xHideUsed" checked> キュー済み・X投稿済みを隠す</label>
+    </div>
+    <div class="table-wrap"><table class="posts" id="xAssetTable"></table></div>
   </section>
 </div>
 
@@ -684,14 +756,16 @@ const dayDiff = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 864e5);
 const fmt = (n) => (n == null ? "—" : Number(n).toLocaleString("ja-JP"));
 const oneLine = (s) => (s || "").replace(/\s+/g, " ").trim();
 
+const VIEWS = { "#review": ["#reviewView", "#tabReview"], "#dashboard": ["#dashView", "#tabDash"], "#x": ["#xView", "#tabX"] };
 function route() {
-  const isDash = location.hash === "#dashboard";
-  $("#reviewView").hidden = isDash;
-  $("#dashView").hidden = !isDash;
-  $("#tabReview").toggleAttribute("aria-current", !isDash);
-  $("#tabDash").toggleAttribute("aria-current", isDash);
-  if (isDash) { $("#tabDash").setAttribute("aria-current", "page"); loadDash(); }
-  else $("#tabReview").setAttribute("aria-current", "page");
+  const key = VIEWS[location.hash] ? location.hash : "#review";
+  for (const [k, [view, tab]] of Object.entries(VIEWS)) {
+    $(view).hidden = k !== key;
+    if (k === key) $(tab).setAttribute("aria-current", "page");
+    else $(tab).removeAttribute("aria-current");
+  }
+  if (key === "#dashboard") loadDash();
+  if (key === "#x") loadX();
 }
 window.addEventListener("hashchange", route);
 
@@ -917,6 +991,427 @@ function renderTable(d) {
   });
   t.querySelectorAll("input[type=checkbox][data-id]").forEach((cb) => cb.addEventListener("change", () => togglePick(cb.dataset.id)));
 }
+
+// ===== X投稿 =====
+// 過去のIG投稿(content/<日付>/video.mp4 + caption.txt)を X に再利用する。
+// キューは本リポジトリの data/x_queue.json。日次の post-x ワークフローが先頭の queued を1件投稿し、結果を書き戻す。
+const X_QUEUE_PATH = "data/x_queue.json";
+// 素材の取り出し元。アカウントを増やすときはここに足す(stats は SOURCES のキーで指定)
+const X_SOURCES = {
+  iginsight: { label: "ig_insight", repo: "shiro0507/ig_insight", branch: "master", contentDir: "content", stats: "iginsight" },
+};
+const X_MAX = 280;
+const xs = { src: "iginsight", assets: null, queue: null, sha: null, sort: { key: "views", dir: -1 }, editing: null };
+
+// X の重み付き文字数(scripts/x-post.mjs の xWeight と同じ。変えるときは両方)
+function xWeight(text) {
+  let w = 0;
+  const rest = text.normalize("NFC").replace(/https?:\/\/\S+/g, () => { w += 23; return ""; });
+  const light = (cp) => cp <= 4351 || (cp >= 8192 && cp <= 8205) || (cp >= 8208 && cp <= 8223) || (cp >= 8242 && cp <= 8247);
+  for (const { segment } of new Intl.Segmenter("ja", { granularity: "grapheme" }).segment(rest)) {
+    const cps = [...segment];
+    w += cps.length === 1 && light(cps[0].codePointAt(0)) ? 1 : 2;
+  }
+  return w;
+}
+
+// IGキャプション → X用の下書き。ハッシュタグ行を外し、段落を280以内に収まるだけ詰め、入ればタグを2つまで付ける
+function draftFromCaption(cap) {
+  const paras = cap.replace(/\r/g, "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const tags = [];
+  const body = [];
+  for (const p of paras) {
+    const t = p.match(/#[^\s#]+/g) || [];
+    if (t.length && p.replace(/#[^\s#]+/g, "").trim() === "") tags.push(...t);
+    else body.push(p);
+  }
+  const tagStr = tags.slice(0, 2).join(" ");
+  const budget = X_MAX - (tagStr ? xWeight(tagStr) + 2 : 0);
+  let text = "";
+  for (const p of body) {
+    const next = text ? `${text}\n\n${p}` : p;
+    if (xWeight(next) <= budget) text = next;
+    else break;
+  }
+  if (!text && body[0]) {
+    // 1段落目だけで溢れる場合は書記素単位で切って「…」
+    const segs = [...new Intl.Segmenter("ja", { granularity: "grapheme" }).segment(body[0])].map((s) => s.segment);
+    while (segs.length && xWeight(segs.join("") + "…") > budget) segs.pop();
+    text = segs.join("") + "…";
+  }
+  return tagStr ? `${text}\n\n${tagStr}` : text;
+}
+
+// UTF-8 ⇄ base64(Contents API 用)
+function b64encode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function b64decode(b64) {
+  const bin = atob(b64.replace(/\n/g, ""));
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+}
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let i = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (i < items.length) { const k = i++; out[k] = await fn(items[k], k); }
+  }));
+  return out;
+}
+
+function xErr(msg) { $("#xError").innerHTML = msg ? `<div class="error">${escapeHtml(msg)}</div>` : ""; }
+
+// --- キュー読み書き ---
+async function loadQueue() {
+  if (getToken()) {
+    try {
+      const f = await ghFetch(`/contents/${X_QUEUE_PATH}?ref=main`);
+      xs.sha = f.sha;
+      return JSON.parse(b64decode(f.content));
+    } catch (e) {
+      if (!/\(404\)/.test(e.message)) throw e;
+      xs.sha = null;
+      return { items: [] };
+    }
+  }
+  // トークンなし: 読み取りのみ(CDNキャッシュで最大5分遅れる)
+  const res = await fetch(`${RAW}/${REPO}/main/${X_QUEUE_PATH}?t=${Date.now()}`);
+  xs.sha = null;
+  return res.ok ? res.json() : { items: [] };
+}
+
+// 最新のキューを取り直してから mutate を適用して保存(ワークフローの書き戻しと競合したら1回だけやり直す)
+async function saveQueue(mutate, message) {
+  if (!getToken()) throw new Error("キューの編集にはGitHubトークンが必要です（「投稿レビュー」タブで保存してください）");
+  for (let attempt = 0; ; attempt++) {
+    const q = await loadQueue();
+    const err = mutate(q);
+    if (err) throw new Error(err);
+    try {
+      const res = await ghFetch(`/contents/${X_QUEUE_PATH}`, {
+        method: "PUT",
+        body: JSON.stringify({ message, branch: "main", content: b64encode(JSON.stringify(q, null, 2) + "\n"), ...(xs.sha ? { sha: xs.sha } : {}) }),
+      });
+      xs.sha = res.content.sha;
+      xs.queue = q;
+      return;
+    } catch (e) {
+      if (attempt === 0 && /\((409|422)\)/.test(e.message)) continue;
+      throw e;
+    }
+  }
+}
+
+async function dispatchX(itemId, dryRun) {
+  await ghFetch(`/actions/workflows/x-post.yml/dispatches`, {
+    method: "POST",
+    body: JSON.stringify({ ref: "main", inputs: { item_id: itemId || "", dry_run: dryRun ? "true" : "false" } }),
+  }).catch((e) => {
+    if (/\((403|404)\)/.test(e.message)) throw new Error("ワークフローを起動できませんでした。GitHubトークンに Actions: Read and write 権限を追加してください。\n" + e.message);
+    throw e;
+  });
+}
+
+// --- 素材の読み込み(content/ 一覧 + caption.txt + IGインサイトを突き合わせ) ---
+async function loadAssets() {
+  const src = X_SOURCES[xs.src];
+  const tree = await fetch(`https://api.github.com/repos/${src.repo}/git/trees/${src.branch}?recursive=1`, {
+    headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+  }).then(async (r) => {
+    if (!r.ok) throw new Error(`content一覧の取得に失敗 (${r.status}): ${(await r.text()).slice(0, 200)}`);
+    return r.json();
+  });
+  const files = new Set(tree.tree.filter((t) => t.type === "blob").map((t) => t.path));
+  const dirs = [...new Set([...files]
+    .filter((p) => p.startsWith(src.contentDir + "/") && p.endsWith("/video.mp4"))
+    .map((p) => p.slice(0, -"/video.mp4".length)))].sort();
+  const rawBase = `${RAW}/${src.repo}/${src.branch}`;
+
+  if (!dash.cache[src.stats]) {
+    const res = await fetch(`${SOURCES[src.stats].url}?t=${Date.now()}`);
+    if (!res.ok) throw new Error(`インサイトの取得に失敗 (${res.status})`);
+    dash.cache[src.stats] = normalize(await res.json());
+  }
+  const posts = dash.cache[src.stats].posts;
+  const squash = (s) => (s || "").replace(/\s+/g, "");
+
+  return mapLimit(dirs, 8, async (dir) => {
+    const caption = files.has(`${dir}/caption.txt`)
+      ? await fetch(`${rawBase}/${dir}/caption.txt`).then((r) => (r.ok ? r.text() : ""))
+      : "";
+    const date = dir.split("/").pop();
+    const c = squash(caption);
+    // IG側のキャプションは先頭30文字しか保存されていないので、先頭20文字の前方一致で照合。複数当たれば投稿日が近い方
+    const hits = posts.filter((p) => { const h = squash(p.caption).slice(0, 20); return h.length >= 8 && c.startsWith(h); });
+    hits.sort((a, b) => Math.abs(dayDiff(a.postDate, date)) - Math.abs(dayDiff(b.postDate, date)));
+    const p = hits[0];
+    return {
+      id: `${xs.src}:${dir.slice(src.contentDir.length + 1)}`,
+      dir, date, caption, videoUrl: `${rawBase}/${dir}/video.mp4`,
+      igDate: p?.postDate ?? null, views: p?.views ?? null, reach: p?.reach ?? null, saved: p?.saved ?? null,
+      saveRate: p?.saveRate ?? null, likes: p?.likes ?? null, head: oneLine(caption).slice(0, 60),
+    };
+  });
+}
+
+async function loadX(force = false) {
+  xErr("");
+  $("#xStatus").textContent = "読み込み中...";
+  try {
+    if (force) { xs.assets = null; delete dash.cache[X_SOURCES[xs.src].stats]; }
+    const [q, assets] = await Promise.all([loadQueue(), xs.assets ? xs.assets : loadAssets()]);
+    xs.queue = q;
+    xs.assets = assets;
+    renderX();
+    $("#xStatus").textContent = getToken() ? "" : "トークン未設定のため閲覧のみ";
+  } catch (e) {
+    $("#xStatus").textContent = "";
+    xErr(e.message);
+  }
+}
+
+// --- 描画 ---
+const STATUS_LABEL = { queued: "キュー", posted: "X投稿済み", failed: "失敗" };
+function usedMap() {
+  const m = new Map();
+  for (const it of xs.queue?.items || []) if (it.status !== "failed" || !m.has(it.id)) m.set(it.id, it.status);
+  return m;
+}
+
+function renderX() {
+  const items = xs.queue.items || [];
+  const queued = items.filter((it) => it.status === "queued");
+  const hist = items.filter((it) => it.status !== "queued")
+    .sort((a, b) => (b.posted_at || b.attempted_at || "").localeCompare(a.posted_at || a.attempted_at || ""));
+  $("#xQueueCount").textContent = `(${queued.length}件)`;
+  $("#xHistCount").textContent = `(${hist.length}件)`;
+  $("#xQueue").innerHTML = queued.length ? "" : `<div class="empty-state">キューは空です。下の「過去の投稿資産」から追加してください</div>`;
+  queued.forEach((it, i) => $("#xQueue").appendChild(renderXItem(it, i)));
+  $("#xHist").innerHTML = hist.length ? "" : `<div class="empty-state" style="padding:16px 0">まだありません</div>`;
+  hist.forEach((it) => $("#xHist").appendChild(renderXItem(it)));
+  renderAssetTable();
+}
+
+function renderXItem(it, pos) {
+  const el = document.createElement("div");
+  el.className = "xitem";
+  const asset = xs.assets?.find((a) => a.id === it.id);
+  const when = it.status === "posted" ? `投稿 ${formatDate(it.posted_at)}` : it.attempted_at ? `試行 ${formatDate(it.attempted_at)}` : `追加 ${formatDate(it.added_at)}`;
+  el.innerHTML = `
+    <div class="xitem-head">
+      ${pos === 0 ? `<b>次回</b>` : pos != null ? `<b>${pos + 1}番目</b>` : ""}
+      <span class="pill ${it.status}">${STATUS_LABEL[it.status] || it.status}</span>
+      <span>${escapeHtml(it.id)}</span>
+      ${asset?.views != null ? `<span>IG ${fmt(asset.views)} views</span>` : ""}
+      <span>${escapeHtml(when)}</span>
+      ${it.tweet_id ? `<a href="https://x.com/i/status/${encodeURIComponent(it.tweet_id)}" target="_blank" rel="noopener">Xで見る</a>` : ""}
+      <a href="${escapeHtml(`${RAW}/${it.repo}/${it.branch}/${it.dir}/video.mp4`)}" target="_blank" rel="noopener">動画</a>
+    </div>`;
+  if (it.error) el.insertAdjacentHTML("beforeend", `<div class="xerr">${escapeHtml(it.error)}</div>`);
+
+  const status = document.createElement("div");
+  status.className = "status";
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  // rerender=false のボタンは描画し直さず、fn の戻り値(文字列)をその場に表示する
+  const btn = (label, cls, fn, { rerender = true } = {}) => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    if (cls) b.className = cls;
+    b.disabled = !getToken();
+    b.addEventListener("click", async () => {
+      const all = actions.querySelectorAll("button");
+      for (const x of all) x.disabled = true;
+      status.textContent = "処理中...";
+      try {
+        const msg = await fn();
+        if (rerender) { renderX(); return; }
+        status.textContent = msg || "";
+      } catch (e) {
+        status.textContent = e.message;
+      }
+      for (const x of all) x.disabled = false;
+    });
+    actions.appendChild(b);
+  };
+
+  if (it.status === "queued") {
+    const ta = document.createElement("textarea");
+    ta.value = it.text;
+    ta.style.minHeight = "96px";
+    const cnt = document.createElement("div");
+    cnt.className = "xcount";
+    const upd = () => { const w = xWeight(ta.value); cnt.textContent = `${w} / ${X_MAX}`; cnt.classList.toggle("over", w > X_MAX); };
+    ta.addEventListener("input", upd);
+    upd();
+    el.append(ta, cnt);
+    btn("本文を保存", "primary", () => {
+      if (xWeight(ta.value) > X_MAX) throw new Error("文字数オーバーです");
+      return saveQueue((q) => { const x = q.items.find((y) => y.id === it.id && y.status === "queued"); if (!x) return "キューから消えています（再読み込みしてください）"; x.text = ta.value; }, `x-queue: edit ${it.id}`);
+    });
+    if (pos > 0) btn("先頭へ", "", () => saveQueue((q) => {
+      const i = q.items.findIndex((y) => y.id === it.id && y.status === "queued");
+      if (i < 0) return "キューから消えています（再読み込みしてください）";
+      const [x] = q.items.splice(i, 1);
+      q.items.unshift(x);
+    }, `x-queue: move ${it.id} to top`));
+    btn("今すぐ投稿", "", async () => {
+      if (!armed(status)) return "もう一度押すと、今すぐXに投稿します（3秒以内）";
+      await dispatchX(it.id, false);
+      return "投稿ワークフローを起動しました。1〜3分後に「再読み込み」で結果を確認してください。";
+    }, { rerender: false });
+    btn("dry-run", "", async () => {
+      await dispatchX(it.id, true);
+      return "dry-run を起動しました。結果は「実行履歴」のログで確認できます（キューは変わりません）。";
+    }, { rerender: false });
+    btn("取り消し", "danger", () => saveQueue((q) => { q.items = q.items.filter((y) => !(y.id === it.id && y.status === "queued")); }, `x-queue: remove ${it.id}`));
+  } else {
+    el.insertAdjacentHTML("beforeend", `<div class="caption">${escapeHtml(it.text)}</div>`);
+    if (it.status === "failed") {
+      btn("再キュー", "primary", () => saveQueue((q) => {
+        if (q.items.some((y) => y.id === it.id && y.status !== "failed")) return "同じ動画がすでにキュー済みか投稿済みです";
+        const x = q.items.find((y) => y.id === it.id && y.status === "failed");
+        if (!x) return "見つかりません（再読み込みしてください）";
+        x.status = "queued"; delete x.error;
+      }, `x-queue: requeue ${it.id}`));
+      btn("履歴から削除", "danger", () => saveQueue((q) => { q.items = q.items.filter((y) => !(y.id === it.id && y.status === "failed")); }, `x-queue: drop failed ${it.id}`));
+    }
+  }
+  if (actions.children.length) el.append(actions, status);
+  return el;
+}
+
+// 誤タップ防止: 1回目は確認文を出すだけ、3秒以内の2回目で実行(alert/confirmは使わない)
+function armed(el) {
+  const now = Date.now();
+  if (el._armed && now - el._armed < 3000) { el._armed = 0; return true; }
+  el._armed = now;
+  return false;
+}
+
+const X_COLS = [
+  { key: "act", label: "", sortable: false },
+  { key: "date", label: "フォルダ" },
+  { key: "head", label: "キャプション" },
+  { key: "views", label: "IG views", num: true },
+  { key: "reach", label: "reach", num: true },
+  { key: "likes", label: "いいね", num: true },
+  { key: "saved", label: "保存", num: true },
+  { key: "saveRate", label: "保存率", num: true },
+];
+
+function renderAssetTable() {
+  const used = usedMap();
+  const today = jstDate(new Date());
+  const hideFuture = $("#xHideFuture").checked;
+  const hideUsed = $("#xHideUsed").checked;
+  const { key, dir } = xs.sort;
+  const rows = (xs.assets || [])
+    .filter((a) => !(hideFuture && !a.igDate && a.date >= today))
+    .filter((a) => !(hideUsed && ["queued", "posted"].includes(used.get(a.id))))
+    .sort((a, b) => {
+      const x = a[key], y = b[key];
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      return (typeof x === "string" ? x.localeCompare(y) : x - y) * dir;
+    });
+  const head = `<thead><tr>${X_COLS.map((c) =>
+    `<th class="${c.num ? "num" : ""}" data-key="${c.key}"${c.key === key ? ` aria-sort="${dir > 0 ? "ascending" : "descending"}"` : ""}>${c.label}</th>`).join("")}</tr></thead>`;
+  const body = rows.map((a) => {
+    const st = used.get(a.id);
+    const act = st === "queued" || st === "posted"
+      ? `<span class="pill ${st}">${STATUS_LABEL[st]}</span>`
+      : `<button data-add="${escapeHtml(a.id)}">追加</button>`;
+    const igNote = a.igDate ? "" : a.date >= today ? ` <span class="pill">IG予約中</span>` : ` <span class="pill">IG照合なし</span>`;
+    return `<tr>
+      <td class="act">${act}</td>
+      <td>${a.date}${igNote}</td>
+      <td class="cap">${escapeHtml(a.head)}</td>
+      <td class="num">${fmt(a.views)}</td><td class="num">${fmt(a.reach)}</td>
+      <td class="num">${fmt(a.likes)}</td><td class="num">${fmt(a.saved)}</td>
+      <td class="num">${a.saveRate == null ? "—" : (a.saveRate * 100).toFixed(1) + "%"}</td>
+    </tr>`;
+  }).join("");
+  const t = $("#xAssetTable");
+  t.innerHTML = head + `<tbody>${body || `<tr><td colspan="${X_COLS.length}" class="panel-sub">該当なし</td></tr>`}</tbody>`;
+  t.querySelectorAll("th[data-key]").forEach((th) => {
+    if (th.dataset.key === "act") return;
+    th.addEventListener("click", () => {
+      const k = th.dataset.key;
+      xs.sort = { key: k, dir: xs.sort.key === k ? -xs.sort.dir : (k === "head" ? 1 : -1) };
+      renderAssetTable();
+    });
+  });
+  t.querySelectorAll("button[data-add]").forEach((b) => b.addEventListener("click", () => openEditor(b.dataset.add)));
+}
+
+function openEditor(id) {
+  const a = xs.assets.find((x) => x.id === id);
+  if (!a) return;
+  xs.editing = a;
+  $("#xEditorSub").textContent = `${a.id}　IG投稿 ${a.igDate || "—"} ／ ${fmt(a.views)} views ／ 保存率 ${a.saveRate == null ? "—" : (a.saveRate * 100).toFixed(1) + "%"}`;
+  $("#xVideo").src = a.videoUrl;
+  $("#xVideoLink").href = a.videoUrl;
+  $("#xOrigCap").textContent = a.caption || "(caption.txt なし)";
+  $("#xText").value = draftFromCaption(a.caption || "");
+  updateEditorCount();
+  $("#xAddBtn").disabled = !getToken();
+  $("#xAddBtn").textContent = getToken() ? "キューに追加" : "トークン未設定";
+  $("#xEditorPanel").hidden = false;
+  $("#xEditorPanel").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function updateEditorCount() {
+  const w = xWeight($("#xText").value);
+  $("#xTextCount").textContent = `${w} / ${X_MAX}（日本語・絵文字は1文字=2で数えます）`;
+  $("#xTextCount").classList.toggle("over", w > X_MAX);
+}
+function closeEditor() {
+  xs.editing = null;
+  $("#xVideo").removeAttribute("src");
+  $("#xVideo").load();
+  $("#xEditorPanel").hidden = true;
+}
+
+$("#xText").addEventListener("input", updateEditorCount);
+$("#xCancelBtn").addEventListener("click", closeEditor);
+$("#xAddBtn").addEventListener("click", async () => {
+  const a = xs.editing;
+  const text = $("#xText").value.trim();
+  if (!a) return;
+  if (!text) return xErr("本文が空です");
+  if (xWeight(text) > X_MAX) return xErr("本文が280を超えています");
+  const src = X_SOURCES[xs.src];
+  $("#xAddBtn").disabled = true;
+  try {
+    await saveQueue((q) => {
+      if (q.items.some((y) => y.id === a.id && y.status !== "failed")) return "この動画はすでにキュー済みか投稿済みです";
+      q.items = q.items.filter((y) => y.id !== a.id); // 失敗履歴があれば置き換え
+      q.items.push({
+        id: a.id, source: xs.src, repo: src.repo, branch: src.branch, dir: a.dir,
+        text, ig_date: a.igDate, added_at: new Date().toISOString(), status: "queued",
+      });
+    }, `x-queue: add ${a.id}`);
+    xErr("");
+    closeEditor();
+    renderX();
+  } catch (e) {
+    xErr(e.message);
+  } finally {
+    $("#xAddBtn").disabled = false;
+  }
+});
+$("#xRefreshBtn").addEventListener("click", () => loadX(true));
+$("#xHideFuture").addEventListener("change", renderAssetTable);
+$("#xHideUsed").addEventListener("change", renderAssetTable);
+$("#xDryBtn").addEventListener("click", async () => {
+  try { await dispatchX("", true); $("#xStatus").textContent = "dry-run を起動しました。結果は「実行履歴」のログで確認できます。"; }
+  catch (e) { xErr(e.message); }
+});
 
 route();
 </script>
