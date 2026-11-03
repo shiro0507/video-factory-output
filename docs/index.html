@@ -1069,7 +1069,8 @@ function xErr(msg) { $("#xError").innerHTML = msg ? `<div class="error">${escape
 async function loadQueue() {
   if (getToken()) {
     try {
-      const f = await ghFetch(`/contents/${X_QUEUE_PATH}?ref=main`);
+      // GitHub API の GET はブラウザに最大60秒キャッシュされ、古い sha で保存すると 409 になるので必ず取り直す
+      const f = await ghFetch(`/contents/${X_QUEUE_PATH}?ref=main`, { cache: "no-store" });
       xs.sha = f.sha;
       return JSON.parse(b64decode(f.content));
     } catch (e) {
@@ -1100,7 +1101,7 @@ async function saveQueue(mutate, message) {
       xs.queue = q;
       return;
     } catch (e) {
-      if (attempt === 0 && /\((409|422)\)/.test(e.message)) continue;
+      if (attempt < 2 && /\((409|422)\)/.test(e.message)) { await new Promise((r) => setTimeout(r, 1500)); continue; }
       throw e;
     }
   }
