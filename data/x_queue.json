@@ -13,6 +13,17 @@
       "attempted_at": "2026-11-03T01:39:41.304Z",
       "tweet_id": "2117431486928302358",
       "posted_at": "2026-11-03T01:39:41.304Z"
+    },
+    {
+      "id": "iginsight:2026-06-30",
+      "source": "iginsight",
+      "repo": "shiro0507/ig_insight",
+      "branch": "master",
+      "dir": "content/2026-06-30",
+      "text": "「性病は自然に治る」←これ、大きな誤解です😮\n\n#性病 #梅毒",
+      "ig_date": "2026-06-30",
+      "added_at": "2026-11-03T01:46:15.012Z",
+      "status": "queued"
     }
   ]
 }
