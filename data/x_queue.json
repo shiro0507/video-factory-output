@@ -9,7 +9,9 @@
       "text": "🚨 HIV感染に「気づけなかった」人たちが、後になって共通して語るきっかけが5つあります。\n\n#HIV感染 #性病検査",
       "ig_date": "2026-06-24",
       "added_at": "2026-11-03T01:26:03.983Z",
-      "status": "queued"
+      "status": "failed",
+      "attempted_at": "2026-11-03T01:31:49.162Z",
+      "error": "X API POST /media/upload/initialize → 503 (rate-limit-remaining 40000): {\"detail\":\"Service Unavailable\",\"status\":503,\"title\":\"Service Unavailable\",\"type\":\"about:blank\"}"
     }
   ]
 }
