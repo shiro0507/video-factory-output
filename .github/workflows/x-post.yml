@@ -16,6 +16,10 @@ on:
         description: "dry-run(Xに送信しない)"
         type: boolean
         default: false
+      check:
+        description: "接続診断のみ(認証・アップロード初期化を確認。投稿もキュー変更もしない)"
+        type: boolean
+        default: false
 
 concurrency:
   group: x-post
@@ -34,8 +38,18 @@ jobs:
         with:
           node-version: "22"
 
+      - name: X 接続診断
+        if: inputs.check
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+        run: node scripts/x-post.mjs check
+
       - name: X に投稿
         id: post
+        if: ${{ !inputs.check }}
         env:
           X_API_KEY: ${{ secrets.X_API_KEY }}
           X_API_SECRET: ${{ secrets.X_API_SECRET }}

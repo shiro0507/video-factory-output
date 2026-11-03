@@ -64,14 +64,24 @@ function oauthHeader(method, url, query = {}) {
   return "OAuth " + Object.keys(oauth).sort().map((k) => `${enc(k)}="${enc(oauth[k])}"`).join(", ");
 }
 
-async function xFetch(method, path, { query, json, form } = {}) {
+async function xFetch(method, path, { query, json, form, retries = 3 } = {}) {
   const url = `${API}${path}`;
   const qs = query ? "?" + new URLSearchParams(query).toString() : "";
-  const headers = { Authorization: oauthHeader(method, url, query) };
-  let body;
-  if (json) { headers["Content-Type"] = "application/json"; body = JSON.stringify(json); }
-  if (form) body = form; // Content-Type(boundary付き)は fetch が付ける
-  const res = await fetch(url + qs, { method, headers, body });
+  let res;
+  for (let attempt = 0; ; attempt++) {
+    // 署名(nonce/timestamp)は毎回作り直す
+    const headers = { Authorization: oauthHeader(method, url, query) };
+    let body;
+    if (json) { headers["Content-Type"] = "application/json"; body = JSON.stringify(json); }
+    if (form) body = form; // Content-Type(boundary付き)は fetch が付ける
+    res = await fetch(url + qs, { method, headers, body });
+    // 502/503/504 は一時障害のことがあるので間隔を空けて再試行
+    if (![502, 503, 504].includes(res.status) || attempt >= retries) break;
+    const wait = 10 * 2 ** attempt;
+    console.log(`${method} ${path} → ${res.status}。${wait}秒後に再試行します (${attempt + 1}/${retries})`);
+    await res.text().catch(() => {});
+    await sleep(wait * 1000);
+  }
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { /* 非JSON */ }
@@ -176,6 +186,27 @@ async function post() {
   setOutput("ok", String(result.ok));
 }
 
+// 接続診断: 投稿はせず、認証・プラン・アップロード初期化が通るかだけ確認する
+async function check() {
+  const missing = Object.entries(KEYS).filter(([, v]) => !v).map(([k]) => KEY_ENV[k]);
+  if (missing.length) { console.log(`::error::未設定のSecret: ${missing.join(", ")}`); process.exit(1); }
+  let ng = 0;
+  const step = async (name, fn) => {
+    try { console.log(`✅ ${name}: ${await fn()}`); }
+    catch (e) { ng++; console.log(`❌ ${name}: ${e.message}`); }
+  };
+  await step("認証 (GET /2/users/me)", async () => {
+    const r = await xFetch("GET", "/users/me", { retries: 1 });
+    return `@${r?.data?.username} (id ${r?.data?.id})`;
+  });
+  // 小さなセッションを作るだけ(append/finalize しないので24時間で自動失効、投稿はされない)
+  await step("動画アップロード初期化 (POST /2/media/upload/initialize)", async () => {
+    const r = await xFetch("POST", "/media/upload/initialize", { json: { media_type: "video/mp4", total_bytes: 1048576, media_category: "tweet_video" }, retries: 1 });
+    return `media id ${r?.data?.id}`;
+  });
+  if (ng) process.exit(1);
+}
+
 function apply() {
   if (!existsSync(RESULT_FILE)) { console.log("反映する結果はありません"); return; }
   const r = JSON.parse(readFileSync(RESULT_FILE, "utf8"));
@@ -199,4 +230,5 @@ function apply() {
 const cmd = process.argv[2];
 if (cmd === "post") await post();
 else if (cmd === "apply") apply();
+else if (cmd === "check") await check();
 else if (cmd) { console.error(`未知のコマンド: ${cmd}`); process.exit(2); }
