@@ -24,6 +24,17 @@
       "ig_date": "2026-06-30",
       "added_at": "2026-11-03T01:46:15.012Z",
       "status": "queued"
+    },
+    {
+      "id": "iginsight:2026-06-13",
+      "source": "iginsight",
+      "repo": "shiro0507/ig_insight",
+      "branch": "master",
+      "dir": "content/2026-06-13",
+      "text": "💉 性病って自然治癒するの？知らないと怖い真実…\n\n#性病 #性感染症",
+      "ig_date": "2026-06-13",
+      "added_at": "2026-11-03T01:46:27.891Z",
+      "status": "queued"
     }
   ]
 }
