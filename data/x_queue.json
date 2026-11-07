@@ -55,6 +55,17 @@
       "attempted_at": "2026-11-05T19:28:22.848Z",
       "tweet_id": "2118425208038306237",
       "posted_at": "2026-11-05T19:28:22.848Z"
+    },
+    {
+      "id": "iginsight:2026-06-28",
+      "source": "iginsight",
+      "repo": "shiro0507/ig_insight",
+      "branch": "master",
+      "dir": "content/2026-06-28",
+      "text": "⚠️ HIVに感染したかもしれない…そんな時、あなたには72時間しかありません。\n\n#HIV #PEP",
+      "ig_date": "2026-06-28",
+      "added_at": "2026-11-07T06:51:58.059Z",
+      "status": "queued"
     }
   ]
 }
