@@ -115,6 +115,10 @@
     {
       "date": "2026-11-11",
       "followers_count": 3
+    },
+    {
+      "date": "2026-11-12",
+      "followers_count": 3
     }
   ],
   "18059587448609240": {
@@ -403,6 +407,16 @@
       },
       {
         "date": "2026-11-11",
+        "views": 41,
+        "reach": 37,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-12",
         "views": 41,
         "reach": 37,
         "saved": 0,
@@ -706,6 +720,16 @@
         "likes": 0,
         "comments": 0,
         "shares": 0
+      },
+      {
+        "date": "2026-11-12",
+        "views": 8,
+        "reach": 7,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
       }
     ]
   },
@@ -995,6 +1019,16 @@
       },
       {
         "date": "2026-11-11",
+        "views": 14,
+        "reach": 13,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-12",
         "views": 14,
         "reach": 13,
         "saved": 0,
@@ -1298,6 +1332,16 @@
         "likes": 0,
         "comments": 0,
         "shares": 0
+      },
+      {
+        "date": "2026-11-12",
+        "views": 234,
+        "reach": 221,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
       }
     ]
   },
@@ -1587,6 +1631,16 @@
       },
       {
         "date": "2026-11-11",
+        "views": 171,
+        "reach": 174,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-12",
         "views": 171,
         "reach": 174,
         "saved": 0,
@@ -1890,6 +1944,16 @@
         "likes": 0,
         "comments": 0,
         "shares": 0
+      },
+      {
+        "date": "2026-11-12",
+        "views": 201,
+        "reach": 193,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
       }
     ]
   },
@@ -2179,6 +2243,16 @@
       },
       {
         "date": "2026-11-11",
+        "views": 191,
+        "reach": 197,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-12",
         "views": 191,
         "reach": 197,
         "saved": 0,
@@ -2482,6 +2556,16 @@
         "likes": 0,
         "comments": 0,
         "shares": 0
+      },
+      {
+        "date": "2026-11-12",
+        "views": 184,
+        "reach": 179,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
       }
     ]
   },
@@ -2771,6 +2855,16 @@
       },
       {
         "date": "2026-11-11",
+        "views": 191,
+        "reach": 189,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-12",
         "views": 191,
         "reach": 189,
         "saved": 0,
@@ -3074,6 +3168,16 @@
         "likes": 1,
         "comments": 0,
         "shares": 1
+      },
+      {
+        "date": "2026-11-12",
+        "views": 211,
+        "reach": 203,
+        "saved": 0,
+        "total_interactions": 2,
+        "likes": 1,
+        "comments": 0,
+        "shares": 1
       }
     ]
   },
@@ -3363,6 +3467,16 @@
       },
       {
         "date": "2026-11-11",
+        "views": 206,
+        "reach": 194,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-12",
         "views": 206,
         "reach": 194,
         "saved": 0,
@@ -3666,6 +3780,16 @@
         "likes": 0,
         "comments": 0,
         "shares": 0
+      },
+      {
+        "date": "2026-11-12",
+        "views": 158,
+        "reach": 151,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
       }
     ]
   },
@@ -3955,6 +4079,16 @@
       },
       {
         "date": "2026-11-11",
+        "views": 107,
+        "reach": 104,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-12",
         "views": 107,
         "reach": 104,
         "saved": 0,
@@ -4258,6 +4392,16 @@
         "likes": 1,
         "comments": 0,
         "shares": 0
+      },
+      {
+        "date": "2026-11-12",
+        "views": 105,
+        "reach": 103,
+        "saved": 0,
+        "total_interactions": 1,
+        "likes": 1,
+        "comments": 0,
+        "shares": 0
       }
     ]
   },
@@ -4547,6 +4691,16 @@
       },
       {
         "date": "2026-11-11",
+        "views": 151,
+        "reach": 144,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-12",
         "views": 151,
         "reach": 144,
         "saved": 0,
