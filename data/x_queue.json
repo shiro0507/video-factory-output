@@ -127,6 +127,17 @@
       "ig_date": "2026-07-10",
       "added_at": "2026-11-16T03:16:05.571Z",
       "status": "queued"
+    },
+    {
+      "id": "iginsight:2026-11-13",
+      "source": "iginsight",
+      "repo": "shiro0507/ig_insight",
+      "branch": "master",
+      "dir": "content/2026-11-13",
+      "text": "「症状がないから大丈夫」…その思い込み、危ないかもしれません⚠️\n\n#性病検査 #クラミジア",
+      "ig_date": "2026-11-14",
+      "added_at": "2026-11-16T03:16:11.913Z",
+      "status": "queued"
     }
   ]
 }
