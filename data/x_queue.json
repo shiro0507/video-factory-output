@@ -105,6 +105,17 @@
       "ig_date": "2026-06-03",
       "added_at": "2026-11-16T03:15:52.762Z",
       "status": "queued"
+    },
+    {
+      "id": "iginsight:2026-06-25",
+      "source": "iginsight",
+      "repo": "shiro0507/ig_insight",
+      "branch": "master",
+      "dir": "content/2026-06-25",
+      "text": "「しこり」や「発疹」、もしかして梅毒のサインかも⚠️\n\n#梅毒 #性感染症",
+      "ig_date": "2026-06-25",
+      "added_at": "2026-11-16T03:15:59.422Z",
+      "status": "queued"
     }
   ]
 }
