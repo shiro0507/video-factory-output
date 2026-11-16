@@ -182,6 +182,17 @@
       "ig_date": "2026-06-04",
       "added_at": "2026-11-16T03:18:52.332Z",
       "status": "queued"
+    },
+    {
+      "id": "iginsight:2026-06-15",
+      "source": "iginsight",
+      "repo": "shiro0507/ig_insight",
+      "branch": "master",
+      "dir": "content/2026-06-15",
+      "text": "🦠 毛じらみって、まだ他人事だと思ってる？\n\n#毛じらみ #性感染症",
+      "ig_date": "2026-06-15",
+      "added_at": "2026-11-16T03:18:58.773Z",
+      "status": "queued"
     }
   ]
 }
