@@ -160,6 +160,17 @@
       "ig_date": "2026-07-03",
       "added_at": "2026-11-16T03:16:25.325Z",
       "status": "queued"
+    },
+    {
+      "id": "iginsight:2026-06-19",
+      "source": "iginsight",
+      "repo": "shiro0507/ig_insight",
+      "branch": "master",
+      "dir": "content/2026-06-19",
+      "text": "「まさか自分が…」と思っているあなた、それが一番危ない🚨\n\n#HIV検査 #性感染症",
+      "ig_date": "2026-06-19",
+      "added_at": "2026-11-16T03:18:45.104Z",
+      "status": "queued"
     }
   ]
 }
