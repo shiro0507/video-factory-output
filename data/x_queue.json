@@ -149,6 +149,17 @@
       "ig_date": "2026-07-08",
       "added_at": "2026-11-16T03:16:19.391Z",
       "status": "queued"
+    },
+    {
+      "id": "iginsight:2026-07-03",
+      "source": "iginsight",
+      "repo": "shiro0507/ig_insight",
+      "branch": "master",
+      "dir": "content/2026-07-03",
+      "text": "性器にできた「いぼ」、放置してませんか？😳\n\n#HPV #性病チェック",
+      "ig_date": "2026-07-03",
+      "added_at": "2026-11-16T03:16:25.325Z",
+      "status": "queued"
     }
   ]
 }
