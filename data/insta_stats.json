@@ -135,6 +135,10 @@
     {
       "date": "2026-11-16",
       "followers_count": 0
+    },
+    {
+      "date": "2026-11-17",
+      "followers_count": 0
     }
   ],
   "17961042861209019": {
@@ -473,6 +477,16 @@
       },
       {
         "date": "2026-11-16",
+        "views": 92,
+        "reach": 90,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-17",
         "views": 92,
         "reach": 90,
         "saved": 0,
@@ -826,6 +840,16 @@
         "likes": 0,
         "comments": 0,
         "shares": 0
+      },
+      {
+        "date": "2026-11-17",
+        "views": 10,
+        "reach": 10,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
       }
     ]
   },
@@ -1165,6 +1189,16 @@
       },
       {
         "date": "2026-11-16",
+        "views": 25,
+        "reach": 24,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-17",
         "views": 25,
         "reach": 24,
         "saved": 0,
@@ -1518,6 +1552,16 @@
         "likes": 0,
         "comments": 0,
         "shares": 0
+      },
+      {
+        "date": "2026-11-17",
+        "views": 112,
+        "reach": 107,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
       }
     ]
   },
@@ -1857,6 +1901,16 @@
       },
       {
         "date": "2026-11-16",
+        "views": 108,
+        "reach": 102,
+        "saved": 0,
+        "total_interactions": 1,
+        "likes": 1,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-17",
         "views": 108,
         "reach": 102,
         "saved": 0,
@@ -2210,6 +2264,16 @@
         "likes": 0,
         "comments": 0,
         "shares": 0
+      },
+      {
+        "date": "2026-11-17",
+        "views": 70,
+        "reach": 64,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
       }
     ]
   },
@@ -2549,6 +2613,16 @@
       },
       {
         "date": "2026-11-16",
+        "views": 101,
+        "reach": 100,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-17",
         "views": 101,
         "reach": 100,
         "saved": 0,
@@ -2902,6 +2976,16 @@
         "likes": 0,
         "comments": 0,
         "shares": 0
+      },
+      {
+        "date": "2026-11-17",
+        "views": 128,
+        "reach": 117,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
       }
     ]
   },
@@ -3241,6 +3325,16 @@
       },
       {
         "date": "2026-11-16",
+        "views": 95,
+        "reach": 89,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-17",
         "views": 95,
         "reach": 89,
         "saved": 0,
@@ -3594,6 +3688,16 @@
         "likes": 0,
         "comments": 0,
         "shares": 0
+      },
+      {
+        "date": "2026-11-17",
+        "views": 119,
+        "reach": 110,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
       }
     ]
   },
@@ -3930,6 +4034,16 @@
         "likes": 0,
         "comments": 0,
         "shares": 0
+      },
+      {
+        "date": "2026-11-17",
+        "views": 86,
+        "reach": 85,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
       }
     ]
   },
@@ -4221,6 +4335,32 @@
         "date": "2026-11-16",
         "views": 149,
         "reach": 136,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-11-17",
+        "views": 149,
+        "reach": 136,
+        "saved": 0,
+        "total_interactions": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      }
+    ]
+  },
+  "17953091973055260": {
+    "caption": "2時間で解けない問題は、\n4時間かけても解けない。\n\n「あと",
+    "created_at": "2026-11-16T10:34:05+0000",
+    "history": [
+      {
+        "date": "2026-11-17",
+        "views": 119,
+        "reach": 107,
         "saved": 0,
         "total_interactions": 0,
         "likes": 0,
