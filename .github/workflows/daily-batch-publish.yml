@@ -28,6 +28,7 @@ jobs:
     steps:
       # 投稿先アカウント(Release本文metaの account。未指定は main)ごとに、
       # 承認済みキューの最古1件ずつをpublishする(=各アカウント1日1投稿)。
+      # meta.publish_at(日時指定)があるものは scheduled-publish.yml の担当なので対象外。
       - name: アカウントごとに承認済みキューの最古1件をpublish(→ publish.ymlがInstagram投稿)
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PAT }}
@@ -35,7 +36,9 @@ jobs:
           set -euo pipefail
           PICKED=$(gh api "repos/${{ github.repository }}/releases" --paginate --slurp | jq -r '
             [.[][] | select(.draft==true and .prerelease==true)
-              | . + {account: ((.body // "" | capture("```json\n(?<j>[\\s\\S]*?)\n```").j | (try fromjson catch {}) | .account) // "main")}]
+              | . + {meta: ([(.body // "") | capture("```json\n(?<j>[\\s\\S]*?)\n```") | .j | (try fromjson catch {})] | first // {})}
+              | select(.meta.publish_at == null)
+              | . + {account: (.meta.account // "main")}]
             | sort_by(.created_at) | group_by(.account) | map(.[0])
             | .[] | "\(.id)\t\(.name)\t\(.account)"')
           if [ -z "$PICKED" ]; then

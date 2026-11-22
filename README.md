@@ -41,6 +41,14 @@ GCP Cloud Run Job          このリポジトリ                 レビューUI(
      Instagram投稿を実行する
   - 却下する場合はレビューUIの「却下して削除」（どの段階でも可）
   - キューから戻したい場合は「キューから戻す」（`prerelease=false` に戻すだけ）
+- **日時指定の投稿**: meta に `publish_at` があるリリースは、承認後に日次バッチではなく
+  `scheduled-publish.yml`（毎時05分に起動）が担当し、その時刻を過ぎた最初の起動で publish する
+  （19:00指定なら19:05ごろ、19:30指定なら20:05ごろ。GitHubのscheduleの遅延でさらに遅れることがある）。
+  日次バッチの対象からは外れるので、
+  「1アカウント1日1件」の制限もかからない。
+  - レビューUIの承認時に「投稿日時(JST)」を入力すると `publish_at` が本文metaに書き込まれる
+    （空欄なら従来どおり日次バッチ）。アップロード時に meta に入れておいてもよい
+  - 日時を変えたいときは「キューから戻す」→ 日時を入れ直して再承認
 
 ## Release に添付するもの（GCP 側 / アップロードスクリプトが生成）
 
@@ -60,9 +68,13 @@ GCP Cloud Run Job          このリポジトリ                 レビューUI(
   "hashtags": ["旅行", "vlog", "#already_hashed_ok"],
   "media_type": "REELS",
   "thumb_offset": 408,
-  "account": "main"
+  "account": "main",
+  "publish_at": "2026-11-25T10:00:00Z"
 }
 ```
+
+- `publish_at`（任意）: 投稿日時。**UTC** の ISO8601（`Z` 付き。例は 2026-11-25 19:00 JST）。
+  省略時は日次バッチで順番に投稿
 
 - `account` は投稿先Instagramアカウント: `"main"`（既定・省略可）または `"neco"`（nemu_neco99）。
   アップロード時に `IG_ACCOUNT=neco` を指定すると入る

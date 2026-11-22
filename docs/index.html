@@ -140,6 +140,27 @@
     border-color: #d58cff;
     color: #d58cff;
   }
+  .schedule-row {
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .schedule-row input {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 6px;
+    color-scheme: dark light;
+  }
+  .schedule-hint {
+    color: var(--muted);
+    font-size: 0.7rem;
+    margin-top: -6px;
+  }
   .card-body {
     padding: 14px;
     display: flex;
@@ -500,6 +521,37 @@ function formatDate(iso) {
   }
 }
 
+// ===== 日時指定(meta.publish_at) =====
+// metaにはUTCのISO8601("2026-11-25T10:00:00Z")で保存し、画面ではJSTで入力・表示する。
+// publish_at のある承認済みリリースは scheduled-publish.yml(毎時05分)が時刻を過ぎたら投稿し、
+// 日次バッチの対象からは外れる。
+function publishAtOf(rel) {
+  const meta = parseMeta(rel.body);
+  return (meta && meta.publish_at) || null;
+}
+function formatJst(iso) {
+  return new Date(iso).toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo", year: "numeric", month: "numeric", day: "numeric",
+    weekday: "short", hour: "2-digit", minute: "2-digit",
+  });
+}
+// <input type="datetime-local"> 用の "YYYY-MM-DDTHH:mm"(JST)
+function isoToJstInput(iso) {
+  const d = new Date(new Date(iso).getTime() + 9 * 3600e3);
+  return d.toISOString().slice(0, 16);
+}
+function jstInputToIso(v) {
+  return new Date(`${v}:00+09:00`).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+// Release本文のjsonブロック内の publish_at だけを差し替えた本文を返す(null なら削除)
+function bodyWithPublishAt(body, iso) {
+  const meta = parseMeta(body);
+  if (!meta) throw new Error("Release本文にmetaのjsonブロックがないため日時指定できません");
+  if (iso) meta.publish_at = iso;
+  else delete meta.publish_at;
+  return body.replace(/```json\n[\s\S]*?\n```/, "```json\n" + JSON.stringify(meta, null, 2) + "\n```");
+}
+
 async function loadReleases() {
   showError("");
   globalStatus.textContent = "読み込み中...";
@@ -527,9 +579,16 @@ async function loadReleases() {
     queueGrid.innerHTML = queued.length
       ? ""
       : `<div class="empty-state">投稿待ちキューは空です</div>`;
+    // 日時指定のものを投稿予定時刻順に先に並べ、残りは日次バッチ分。
     // 日次バッチはアカウントごとに最古1件ずつ投稿するので、順番もアカウント単位で数える
+    const scheduled = queued
+      .filter((r) => publishAtOf(r))
+      .sort((a, b) => new Date(publishAtOf(a)) - new Date(publishAtOf(b)));
+    for (const rel of scheduled) {
+      queueGrid.appendChild(await renderCard(rel, "queued"));
+    }
     const posByAccount = {};
-    for (const rel of queued) {
+    for (const rel of queued.filter((r) => !publishAtOf(r))) {
       const account = accountOf(rel);
       posByAccount[account] = (posByAccount[account] || 0) + 1;
       queueGrid.appendChild(await renderCard(rel, "queued", posByAccount[account]));
@@ -610,10 +669,15 @@ async function renderCard(rel, mode, queuePosition) {
   accountBadge.textContent = `📮 投稿先: ${ACCOUNT_LABELS[account] || account}`;
   body.appendChild(accountBadge);
 
+  const publishAt = meta && meta.publish_at;
   if (mode === "queued") {
     const badge = document.createElement("div");
     badge.className = "badge";
-    badge.textContent = queuePosition === 1 ? `次回投稿予定(${account})` : `${account} の${queuePosition}番目`;
+    if (publishAt) {
+      badge.textContent = `⏰ 日時指定: ${formatJst(publishAt)}`;
+    } else {
+      badge.textContent = queuePosition === 1 ? `次回投稿予定(${account})` : `${account} の${queuePosition}番目`;
+    }
     body.appendChild(badge);
   }
 
@@ -654,19 +718,44 @@ async function renderCard(rel, mode, queuePosition) {
   }
 
   if (mode === "pending") {
+    // 投稿日時(任意)。空欄なら日次バッチ(毎日5:00 JSTごろ)で順番に投稿
+    const scheduleRow = document.createElement("label");
+    scheduleRow.className = "schedule-row";
+    scheduleRow.textContent = "投稿日時(JST・任意): ";
+    const scheduleInput = document.createElement("input");
+    scheduleInput.type = "datetime-local";
+    scheduleInput.step = 60 * 60;
+    if (publishAt) scheduleInput.value = isoToJstInput(publishAt);
+    scheduleRow.appendChild(scheduleInput);
+    const scheduleHint = document.createElement("div");
+    scheduleHint.className = "schedule-hint";
+    scheduleHint.textContent = "空欄なら日次バッチで順番に投稿。指定すると毎時05分のチェックで、その時刻を過ぎた最初の回に投稿（19:00指定なら19:05ごろ。さらに遅れることがあります）";
+    body.appendChild(scheduleRow);
+    body.appendChild(scheduleHint);
+
     const approveBtn = document.createElement("button");
     approveBtn.className = "primary";
     approveBtn.textContent = "承認";
     approveBtn.addEventListener("click", async () => {
-      if (!confirm(`「${rel.name}」を承認済みキューに追加します。実際の投稿は次回の日次バッチ（毎日5:00 JSTごろ起動）です。よろしいですか？`)) return;
+      const newAt = scheduleInput.value ? jstInputToIso(scheduleInput.value) : null;
+      if (newAt && new Date(newAt) <= new Date()) {
+        status.textContent = "過去の日時は指定できません";
+        return;
+      }
+      const when = newAt
+        ? `${formatJst(newAt)}（JST）ごろに投稿されます`
+        : "実際の投稿は次回の日次バッチ（毎日5:00 JSTごろ起動）です";
+      if (!confirm(`「${rel.name}」を承認済みキューに追加します。${when}。よろしいですか？`)) return;
       setBusy(true, "更新中...");
       try {
         // tag_nameを明示しないと、draft中に一度でもPATCHすると
         // GitHubが割り当てた仮タグ名("untagged-xxxx")が本タグとして
         // 確定してしまうため、毎回nameの値をtag_nameとして送り直す
+        const patch = { prerelease: true, tag_name: rel.name };
+        if ((newAt || null) !== (publishAt || null)) patch.body = bodyWithPublishAt(rel.body, newAt);
         await ghFetch(`/releases/${rel.id}`, {
           method: "PATCH",
-          body: JSON.stringify({ prerelease: true, tag_name: rel.name }),
+          body: JSON.stringify(patch),
         });
         card.remove();
         globalStatus.textContent = "承認済みキューに追加しました";

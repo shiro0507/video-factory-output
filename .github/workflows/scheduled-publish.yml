@@ -1,0 +1,51 @@
+name: scheduled-publish
+
+# 日時指定の投稿。承認済みキュー(draft=true & prerelease=true)のうち、
+# Release本文metaに publish_at(UTCのISO8601。例 "2026-11-25T10:00:00Z")があり、
+# その時刻を過ぎたものをすべてpublishする。publishが release:published を発火し、
+# 実際のInstagram投稿は publish.yml が担当する。
+# publish_at が無いものは daily-batch-publish.yml(毎日5:00 JSTごろ、1アカウント1件)の担当。
+#
+# 注意(daily-batch-publish.yml と同じ):
+# - 対象は release id で特定し、PATCH時は tag_name に release.name を必ず明示する
+#   (draft中の仮タグ名 "untagged-xxxx" が確定してしまうのを防ぐ)。
+# - publish は secrets.RELEASE_PAT で行う(GITHUB_TOKEN だと publish.yml が起動しない)。
+# - 起動は1時間に1回(毎時05分 UTC指定 = JSTでも毎時05分)。投稿は指定時刻ちょうどではなく
+#   「指定時刻を過ぎた最初の起動時」になる。19:00指定なら19:05ごろ、19:30指定なら20:05ごろ。
+#   さらにGitHubのscheduleは混雑時に遅れることがある(毎時00分は特に混むので05分にずらしている)。
+on:
+  schedule:
+    - cron: "5 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: scheduled-publish
+  cancel-in-progress: false
+
+jobs:
+  publish-due:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 指定時刻を過ぎた承認済みリリースをpublish(→ publish.ymlがInstagram投稿)
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          set -euo pipefail
+          PICKED=$(gh api "repos/${{ github.repository }}/releases" --paginate --slurp | jq -r '
+            [.[][] | select(.draft==true and .prerelease==true)
+              | . + {meta: ([(.body // "") | capture("```json\n(?<j>[\\s\\S]*?)\n```") | .j | (try fromjson catch {})] | first // {})}
+              | select(.meta.publish_at != null)
+              | . + {due: (.meta.publish_at | try fromdateiso8601 catch null)}
+              | select(.due != null and .due <= now)]
+            | sort_by(.due)
+            | .[] | "\(.id)\t\(.name)\t\(.meta.account // "main")\t\(.meta.publish_at)"')
+          if [ -z "$PICKED" ]; then
+            echo "指定時刻を過ぎた予約はありません。"
+            exit 0
+          fi
+          while IFS=$'\t' read -r ID NAME ACCOUNT AT; do
+            echo "投稿対象 account=$ACCOUNT release id=$ID name=$NAME publish_at=$AT"
+            gh api "repos/${{ github.repository }}/releases/$ID" \
+              -X PATCH -F draft=false -F prerelease=false -f "tag_name=$NAME" > /dev/null
+          done <<< "$PICKED"
